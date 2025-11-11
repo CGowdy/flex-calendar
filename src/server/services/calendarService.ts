@@ -120,6 +120,7 @@ interface GenerateDaysParams {
   totalDays: number
   startDate: Date
   includeWeekends: boolean
+  titlePattern?: string
   eventsForGrouping: Array<{
     title: string
     description?: string
@@ -133,6 +134,7 @@ function generateDaysForGrouping({
   totalDays,
   startDate,
   includeWeekends,
+  titlePattern,
   eventsForGrouping,
 }: GenerateDaysParams): CalendarDay[] {
   const days: CalendarDay[] = []
@@ -143,11 +145,15 @@ function generateDaysForGrouping({
     const groupingSequence = index + 1
 
     const templateEvent = eventsForGrouping[groupingSequence - 1]
+    const computedTitle =
+      templateEvent?.title ??
+      (titlePattern && titlePattern.includes('{n}')
+        ? titlePattern.replace('{n}', String(groupingSequence))
+        : `${groupingName} Lesson ${groupingSequence}`)
     const events: CalendarEvent[] = [
       {
         _id: nanoid(),
-        title:
-          templateEvent?.title ?? `${groupingName} Lesson ${groupingSequence}`,
+        title: computedTitle,
         description: templateEvent?.description ?? '',
         durationDays: templateEvent?.durationDays ?? 1,
         metadata: {},
@@ -203,6 +209,10 @@ export async function createCalendar(
   const groupings = normalizeGroupings(payload.groupings)
   const startDate = new Date(payload.startDate)
 
+  const groupingPatternByKey = new Map<string, string | undefined>(
+    (payload.groupings ?? []).map((g) => [g.key, g.titlePattern])
+  )
+
   const days = groupings.flatMap((grouping) =>
     generateDaysForGrouping({
       groupingKey: grouping.key,
@@ -210,6 +220,7 @@ export async function createCalendar(
       includeWeekends,
       startDate,
       totalDays,
+      titlePattern: groupingPatternByKey.get(grouping.key),
       eventsForGrouping: payload.eventsPerGrouping?.[grouping.key] ?? [],
     })
   )

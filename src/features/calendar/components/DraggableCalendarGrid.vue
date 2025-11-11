@@ -143,7 +143,8 @@ function handleShift(day: CalendarDay, delta: number) {
 
 .column-subtitle {
   font-size: 0.8rem;
-  color: rgba(15, 23, 42, 0.6);
+  color: var(--color-text);
+  opacity: 0.75;
 }
 
 .day-list {
@@ -161,14 +162,14 @@ function handleShift(day: CalendarDay, delta: number) {
   gap: 0.5rem;
   border: 1px solid transparent;
   border-radius: 0.9rem;
-  background: rgba(15, 23, 42, 0.04);
+  background: var(--color-background-mute);
   padding: 0.65rem;
   transition: border-color 0.2s ease, background-color 0.2s ease;
 }
 
 .day-card.active {
   border-color: rgba(37, 99, 235, 0.5);
-  background: rgba(37, 99, 235, 0.1);
+  background: rgba(37, 99, 235, 0.15);
 }
 
 .day-card__main {
@@ -201,12 +202,14 @@ function handleShift(day: CalendarDay, delta: number) {
 
 .day-date {
   font-size: 0.85rem;
-  color: rgba(15, 23, 42, 0.65);
+  color: var(--color-text);
+  opacity: 0.75;
 }
 
 .day-event {
   font-size: 0.85rem;
-  color: rgba(15, 23, 42, 0.7);
+  color: var(--color-text);
+  opacity: 0.9;
 }
 
 .day-actions {

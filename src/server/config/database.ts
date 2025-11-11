@@ -1,8 +1,10 @@
 import mongoose from 'mongoose'
+import { MongoMemoryServer } from 'mongodb-memory-server'
 
 import { env } from './env.js'
 
 let isConnecting = false
+let memoryServer: MongoMemoryServer | null = null
 
 export async function connectToDatabase(): Promise<typeof mongoose> {
   if (mongoose.connection.readyState === 1) {
@@ -21,7 +23,12 @@ export async function connectToDatabase(): Promise<typeof mongoose> {
 
   try {
     mongoose.set('strictQuery', true)
-    await mongoose.connect(env.MONGODB_URI)
+    let uri = env.MONGODB_URI
+    if (uri === 'memory') {
+      memoryServer = await MongoMemoryServer.create()
+      uri = memoryServer.getUri()
+    }
+    await mongoose.connect(uri)
     mongoose.connection.on('error', (error) => {
       mongoose.connection.getClient().close().catch(() => undefined)
       throw error
@@ -35,6 +42,10 @@ export async function connectToDatabase(): Promise<typeof mongoose> {
 export async function disconnectFromDatabase(): Promise<void> {
   if (mongoose.connection.readyState !== 0) {
     await mongoose.disconnect()
+  }
+  if (memoryServer) {
+    await memoryServer.stop()
+    memoryServer = null
   }
 }
 

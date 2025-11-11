@@ -52,6 +52,8 @@ export interface CreateCalendarRequest {
     Pick<CalendarGrouping, 'key' | 'name' | 'autoShift'> & {
       color?: string
       description?: string
+      // Optional pattern used during generation, supports "{n}" placeholder
+      titlePattern?: string
     }
   >
   eventsPerGrouping?: Record<

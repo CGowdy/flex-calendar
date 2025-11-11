@@ -138,7 +138,7 @@ function formatDate(date: Date | null): string {
 .timeline__meta {
   font-size: 0.9rem;
   color: var(--color-text);
-  opacity: 0.7;
+  opacity: 0.75;
 }
 
 .timeline__stats {
@@ -152,14 +152,15 @@ function formatDate(date: Date | null): string {
   gap: 0.25rem;
   padding: 0.75rem;
   border-radius: 0.75rem;
-  background: rgba(37, 99, 235, 0.06);
+  background: rgba(37, 99, 235, 0.12);
 }
 
 .stat-label {
   font-size: 0.75rem;
   text-transform: uppercase;
   letter-spacing: 0.05em;
-  color: rgba(15, 23, 42, 0.55);
+  color: var(--color-text);
+  opacity: 0.75;
 }
 
 .stat-card strong {
@@ -187,7 +188,8 @@ function formatDate(date: Date | null): string {
 
 .progress-label {
   font-size: 0.85rem;
-  color: rgba(15, 23, 42, 0.7);
+  color: var(--color-text);
+  opacity: 0.85;
 }
 
 .timeline__upcoming ul {
@@ -207,19 +209,19 @@ function formatDate(date: Date | null): string {
   padding: 0.65rem 0.75rem;
   border-radius: 0.75rem;
   border: 1px solid transparent;
-  background: rgba(15, 23, 42, 0.04);
+  background: var(--color-background-mute);
   cursor: pointer;
   transition: border-color 0.2s ease, background-color 0.2s ease;
 }
 
 .upcoming-day:hover {
   border-color: rgba(37, 99, 235, 0.35);
-  background: rgba(37, 99, 235, 0.08);
+  background: rgba(37, 99, 235, 0.12);
 }
 
 .upcoming-day.active {
   border-color: rgba(37, 99, 235, 0.6);
-  background: rgba(37, 99, 235, 0.14);
+  background: rgba(37, 99, 235, 0.2);
 }
 
 .day-label {
@@ -230,7 +232,8 @@ function formatDate(date: Date | null): string {
 
 .day-date {
   font-size: 0.85rem;
-  color: rgba(15, 23, 42, 0.7);
+  color: var(--color-text);
+  opacity: 0.85;
 }
 
 .chip {
@@ -245,7 +248,8 @@ function formatDate(date: Date | null): string {
 
 .empty {
   font-size: 0.85rem;
-  color: rgba(15, 23, 42, 0.6);
+  color: var(--color-text);
+  opacity: 0.75;
   margin-top: 0.75rem;
   text-align: center;
 }

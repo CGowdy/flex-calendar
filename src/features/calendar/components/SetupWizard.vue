@@ -19,6 +19,7 @@ interface GroupingOption {
   autoShift: boolean
   selected: boolean
   description: string
+  titlePattern: string
 }
 
 const groupingOptions = reactive<GroupingOption[]>([
@@ -29,6 +30,7 @@ const groupingOptions = reactive<GroupingOption[]>([
     autoShift: true,
     selected: true,
     description: 'Primary schedule from Abeka lesson plans.',
+    titlePattern: 'Lesson {n}',
   },
   {
     key: 'student-a',
@@ -37,6 +39,7 @@ const groupingOptions = reactive<GroupingOption[]>([
     autoShift: true,
     selected: true,
     description: 'First student-specific pacing alignment.',
+    titlePattern: '',
   },
   {
     key: 'student-b',
@@ -45,6 +48,7 @@ const groupingOptions = reactive<GroupingOption[]>([
     autoShift: true,
     selected: false,
     description: 'Optional second student schedule.',
+    titlePattern: '',
   },
   {
     key: 'holidays',
@@ -53,6 +57,7 @@ const groupingOptions = reactive<GroupingOption[]>([
     autoShift: false,
     selected: true,
     description: 'Non instructional days that should not shift.',
+    titlePattern: '',
   },
 ])
 
@@ -85,6 +90,9 @@ function handleSubmit() {
       color: grouping.color,
       autoShift: grouping.autoShift,
       description: grouping.description,
+      titlePattern: grouping.titlePattern?.trim()
+        ? grouping.titlePattern.trim()
+        : undefined,
     }))
 
   emit('submit', {
@@ -224,6 +232,16 @@ function toggleGrouping(option: GroupingOption) {
                   @change="toggleGroupAutoShift(grouping)"
                 />
                 <span>Shift automatically when lessons move</span>
+              </label>
+
+              <label class="field">
+                <span>Event title pattern (use {n} for day number)</span>
+                <input
+                  v-model="grouping.titlePattern"
+                  type="text"
+                  :placeholder="'Lesson {n}'"
+                  :disabled="!grouping.selected || submitting"
+                />
               </label>
             </li>
           </ul>

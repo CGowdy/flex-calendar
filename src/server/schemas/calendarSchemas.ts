@@ -6,6 +6,9 @@ export const groupingSchema = z.object({
   color: z.string().optional(),
   description: z.string().optional(),
   autoShift: z.boolean().optional().default(true),
+  // Optional event title pattern used only during calendar creation.
+  // Supports "{n}" placeholder for the day sequence number.
+  titlePattern: z.string().optional(),
 })
 
 export const createCalendarSchema = z.object({
