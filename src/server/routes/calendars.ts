@@ -5,12 +5,14 @@ import {
   calendarIdParamsSchema,
   createCalendarSchema,
   shiftCalendarDaysSchema,
+  updateCalendarSchema,
 } from '../schemas/calendarSchemas.js'
 import {
   createCalendar,
   getCalendarById,
   listCalendars,
   shiftCalendarDays,
+  updateCalendar,
 } from '../services/calendarService.js'
 
 export async function calendarsRoutes(app: FastifyInstance) {
@@ -31,6 +33,16 @@ export async function calendarsRoutes(app: FastifyInstance) {
     const payload = createCalendarSchema.parse(request.body)
     const calendar = await createCalendar(payload)
     reply.code(201)
+    return calendar
+  })
+
+  app.patch('/:calendarId', async (request) => {
+    const { calendarId } = calendarIdParamsSchema.parse(request.params)
+    const body = updateCalendarSchema.parse(request.body)
+    const calendar = await updateCalendar(calendarId, body)
+    if (!calendar) {
+      throw app.httpErrors.notFound('Calendar not found')
+    }
     return calendar
   })
 

@@ -31,7 +31,7 @@ export function useScheduleAdjuster() {
     calendar: Calendar,
     payload: ShiftCalendarDaysRequest
   ): Calendar {
-    const workingCopy = structuredClone(calendar) as Calendar
+    const workingCopy = JSON.parse(JSON.stringify(calendar)) as Calendar
 
     if (payload.shiftByDays === 0) {
       return workingCopy

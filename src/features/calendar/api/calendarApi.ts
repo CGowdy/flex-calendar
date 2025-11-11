@@ -4,6 +4,7 @@ import type {
   CalendarSummary,
   CreateCalendarRequest,
   ShiftCalendarDaysRequest,
+  UpdateCalendarRequest,
 } from '../types/calendar'
 
 export async function fetchCalendars(): Promise<CalendarSummary[]> {
@@ -31,6 +32,16 @@ export async function shiftCalendarDays(
 ): Promise<Calendar> {
   return apiFetch<Calendar>(`/calendars/${calendarId}/shift`, {
     method: 'POST',
+    body: JSON.stringify(payload),
+  })
+}
+
+export async function updateCalendarMeta(
+  calendarId: string,
+  payload: UpdateCalendarRequest
+): Promise<Calendar> {
+  return apiFetch<Calendar>(`/calendars/${calendarId}`, {
+    method: 'PATCH',
     body: JSON.stringify(payload),
   })
 }

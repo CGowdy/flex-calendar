@@ -72,3 +72,15 @@ export interface ShiftCalendarDaysRequest {
   groupingKeys?: string[]
 }
 
+export interface UpdateCalendarRequest {
+  groupings?: Array<{
+    key: string
+    name?: string
+    color?: string
+    description?: string
+    autoShift?: boolean
+  }>
+  includeWeekends?: boolean
+  includeHolidays?: boolean
+}
+

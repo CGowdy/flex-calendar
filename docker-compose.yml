@@ -10,9 +10,9 @@ services:
       - mongo-data:/data/db
 
   api:
-    image: node:20-alpine
+    image: oven/bun:1.1.29-alpine
     working_dir: /app
-    command: sh -c "npm install && npm run dev:server"
+    command: sh -c "bun install && bun run dev:server"
     ports:
       - '3333:3333'
     environment:
@@ -23,7 +23,7 @@ services:
       CORS_ORIGIN: http://localhost:5173
     volumes:
       - .:/app
-      - api-node-modules:/app/node_modules
+      - api-bun-modules:/app/node_modules
     depends_on:
       - mongo
 
@@ -35,7 +35,8 @@ services:
       - '5173:5173'
     environment:
       NODE_ENV: development
-      VITE_API_URL: http://localhost:3333
+      VITE_API_URL: http://localhost:3333/api
+      CHOKIDAR_USEPOLLING: "1"
     volumes:
       - .:/app
       - web-node-modules:/app/node_modules
@@ -44,6 +45,6 @@ services:
 
 volumes:
   mongo-data:
-  api-node-modules:
+  api-bun-modules:
   web-node-modules:
 

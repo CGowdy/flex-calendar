@@ -21,6 +21,11 @@ export default defineConfig({
     },
   },
   server: {
+    watch: {
+      // Helps Docker on Windows/WSL bind-mounts pick up changes
+      usePolling: true,
+      interval: 300,
+    },
     proxy: {
       '/api': {
         target: apiTarget,

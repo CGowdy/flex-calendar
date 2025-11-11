@@ -6,6 +6,7 @@ import {
   fetchCalendarById,
   fetchCalendars,
   shiftCalendarDays,
+  updateCalendarMeta,
 } from '../api/calendarApi'
 import type {
   Calendar,
@@ -37,6 +38,69 @@ export const useCalendarStore = defineStore('calendar', () => {
           .map((grouping) => grouping.key)
       : []
   )
+
+  const hiddenGroupingKeys = ref<Set<string>>(new Set())
+  const visibleGroupingKeys = computed<string[]>(() => {
+    if (!activeCalendar.value) return []
+    return activeCalendar.value.groupings
+      .map((g) => g.key)
+      .filter((k) => !hiddenGroupingKeys.value.has(k))
+  })
+
+  function setGroupingVisibility(key: string, visible: boolean): void {
+    const next = new Set(hiddenGroupingKeys.value)
+    if (visible) {
+      next.delete(key)
+    } else {
+      next.add(key)
+    }
+    hiddenGroupingKeys.value = next
+  }
+
+  function updateGroupingColor(key: string, color: string): void {
+    if (!activeCalendar.value) return
+    const updated = {
+      ...activeCalendar.value,
+      groupings: activeCalendar.value.groupings.map((g) =>
+        g.key === key ? { ...g, color } : g
+      ),
+    }
+    activeCalendar.value = updated
+    calendars.value = calendars.value.map((c) =>
+      c.id === updated.id ? updated : c
+    )
+  }
+
+  async function persistGroupingColor(key: string, color: string): Promise<void> {
+    if (!activeCalendar.value || !activeCalendarId.value) return
+    try {
+      const updated = await updateCalendarMeta(activeCalendarId.value, {
+        groupings: [{ key, color }],
+      })
+      activeCalendar.value = updated
+      calendars.value = calendars.value.map((c) =>
+        c.id === updated.id ? updated : c
+      )
+    } catch (error) {
+      // revert local change if persisted call fails
+      await loadCalendar(activeCalendarId.value, { force: true })
+      throw error
+    }
+  }
+
+  // Debounced persist to avoid spamming the backend while the color input is dragged.
+  const colorPersistTimers = new Map<string, number>()
+  function schedulePersistGroupingColor(key: string, color: string, waitMs = 1000) {
+    const existing = colorPersistTimers.get(key)
+    if (existing) {
+      clearTimeout(existing)
+    }
+    const timer = window.setTimeout(() => {
+      colorPersistTimers.delete(key)
+      void persistGroupingColor(key, color)
+    }, waitMs)
+    colorPersistTimers.set(key, timer)
+  }
 
   const daysByGrouping = computed<Record<string, CalendarDay[]>>(() => {
     if (!activeCalendar.value) {
@@ -147,7 +211,7 @@ export const useCalendarStore = defineStore('calendar', () => {
           : autoShiftGroupingKeys.value,
     }
 
-    const originalSnapshot = structuredClone(activeCalendar.value)
+    const originalSnapshot = activeCalendar.value
     activeCalendar.value = adjuster.shiftCalendarDaysLocally(
       activeCalendar.value,
       shiftOptions
@@ -179,12 +243,17 @@ export const useCalendarStore = defineStore('calendar', () => {
     isLoading,
     errorMessage,
     autoShiftGroupingKeys,
+    visibleGroupingKeys,
     daysByGrouping,
     loadCalendars,
     loadCalendar,
     createCalendarAndSelect,
     selectCalendar,
     shiftCalendarDay,
+    setGroupingVisibility,
+    updateGroupingColor,
+    persistGroupingColor,
+    schedulePersistGroupingColor,
   }
 })
 

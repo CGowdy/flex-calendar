@@ -6,7 +6,9 @@ import { useCalendarStore } from '../stores/useCalendarStore'
 import SetupWizard from './SetupWizard.vue'
 import CalendarTimeline from './CalendarTimeline.vue'
 import DraggableCalendarGrid from './DraggableCalendarGrid.vue'
-import DayDetailDrawer from './DayDetailDrawer.vue'
+import MonthCalendar from './MonthCalendar.vue'
+import WeekCalendar from './WeekCalendar.vue'
+import DayCalendar from './DayCalendar.vue'
 import type {
   Calendar,
   CalendarDay,
@@ -21,7 +23,7 @@ const {
   activeCalendarId,
   isLoading,
   errorMessage,
-  autoShiftGroupingKeys,
+  visibleGroupingKeys,
 } = storeToRefs(calendarStore)
 
 const showSetupWizard = ref(false)
@@ -30,6 +32,8 @@ const isSubmitting = ref(false)
 const shiftInProgress = ref(false)
 
 const selectedCalendar = computed<Calendar | null>(() => activeCalendar.value ?? null)
+const viewMode = ref<'month' | 'week' | 'day' | 'board'>('month')
+const viewDate = ref<Date>(new Date())
 
 const selectedDay = computed<CalendarDay | null>(() => {
   if (!selectedCalendar.value || !selectedDayId.value) {
@@ -133,9 +137,6 @@ async function handleShiftCalendar(payload: ShiftCalendarDaysRequest) {
   }
 }
 
-function handleCloseDrawer() {
-  selectedDayId.value = null
-}
 </script>
 
 <template>
@@ -189,16 +190,83 @@ function handleCloseDrawer() {
       <CalendarTimeline
         :calendar="selectedCalendar"
         :selected-day-id="selectedDayId"
+        :view-date="viewDate"
+        @update:viewDate="(d: Date) => viewDate = d"
+        @jump="(d: Date) => { viewMode = 'month'; viewDate = d }"
         @select-day="handleSelectDay"
       />
 
-      <DraggableCalendarGrid
-        :calendar="selectedCalendar"
-        :selected-day-id="selectedDayId"
-        :disabled="isBusy"
-        @select-day="handleSelectDay"
-        @shift-day="handleShiftCalendar"
-      />
+      <div class="content-right">
+        <div class="view-toggle">
+          <button
+            type="button"
+            class="toggle"
+            :class="{ active: viewMode === 'month' }"
+            @click="viewMode = 'month'"
+          >
+            Month
+          </button>
+          <button
+            type="button"
+            class="toggle"
+            :class="{ active: viewMode === 'week' }"
+            @click="viewMode = 'week'"
+          >
+            Week
+          </button>
+          <button
+            type="button"
+            class="toggle"
+            :class="{ active: viewMode === 'day' }"
+            @click="viewMode = 'day'"
+          >
+            Day
+          </button>
+          <button
+            type="button"
+            class="toggle"
+            :class="{ active: viewMode === 'board' }"
+            @click="viewMode = 'board'"
+          >
+            Board
+          </button>
+        </div>
+
+        <MonthCalendar
+          v-if="viewMode === 'month'"
+          :calendar="selectedCalendar"
+          :selected-day-id="selectedDayId"
+          :view-date="viewDate"
+          :visible-grouping-keys="visibleGroupingKeys"
+          @select-day="handleSelectDay"
+          @shift-day="handleShiftCalendar"
+          @update:viewDate="(d: Date) => viewDate = d"
+        />
+
+        <WeekCalendar
+          v-else-if="viewMode === 'week'"
+          :calendar="selectedCalendar"
+          :selected-day-id="selectedDayId"
+          :visible-grouping-keys="visibleGroupingKeys"
+          @select-day="handleSelectDay"
+        />
+
+        <DayCalendar
+          v-else-if="viewMode === 'day'"
+          :calendar="selectedCalendar"
+          :selected-day-id="selectedDayId"
+          @select-day="handleSelectDay"
+        />
+
+        <DraggableCalendarGrid
+          v-else
+          :calendar="selectedCalendar"
+          :selected-day-id="selectedDayId"
+          :disabled="isBusy"
+          @select-day="handleSelectDay"
+          @shift-day="handleShiftCalendar"
+        />
+      </div>
     </section>
 
     <section v-else-if="!isLoading" class="empty-state">
@@ -225,15 +293,6 @@ function handleCloseDrawer() {
       @cancel="closeSetupWizard"
     />
 
-    <DayDetailDrawer
-      :open="!!selectedDay"
-      :calendar="selectedCalendar"
-      :day="selectedDay"
-      :auto-shift-grouping-keys="autoShiftGroupingKeys"
-      :busy="shiftInProgress"
-      @close="handleCloseDrawer"
-      @shift="handleShiftCalendar"
-    />
   </div>
 </template>
 
@@ -310,6 +369,31 @@ function handleCloseDrawer() {
   grid-template-columns: minmax(260px, 320px) 1fr;
   gap: 1.5rem;
   align-items: start;
+}
+
+.content-right {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.view-toggle {
+  display: inline-flex;
+  gap: 0.25rem;
+}
+
+.toggle {
+  border: 1px solid var(--color-border);
+  background: var(--color-background);
+  color: var(--color-text);
+  padding: 0.35rem 0.6rem;
+  border-radius: 0.5rem;
+  cursor: pointer;
+}
+
+.toggle.active {
+  border-color: rgba(37, 99, 235, 0.5);
+  background: rgba(37, 99, 235, 0.15);
 }
 
 .empty-state {

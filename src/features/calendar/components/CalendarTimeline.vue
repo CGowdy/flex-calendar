@@ -1,16 +1,31 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref, watch } from 'vue'
+import MiniCalendar from './MiniCalendar.vue'
+import { useCalendarStore } from '../stores/useCalendarStore'
 
 import type { Calendar, CalendarDay } from '../types/calendar'
 
 const props = defineProps<{
   calendar: Calendar
   selectedDayId: string | null
+  viewDate: Date
+}>()
+const emit = defineEmits<{
+  (e: 'update:viewDate', d: Date): void
+  (e: 'jump', d: Date): void
+  (e: 'select-day', dayId: string): void
 }>()
 
-const emit = defineEmits<{
-  (event: 'select-day', dayId: string): void
-}>()
+const store = useCalendarStore()
+
+// Keep a local month for the mini calendar so arrow navigation doesn't move the big calendar.
+let miniDate = ref(new Date(props.viewDate))
+watch(
+  () => props.viewDate,
+  (d) => {
+    miniDate.value = new Date(d)
+  }
+)
 
 const startDate = computed(() => new Date(props.calendar.startDate))
 const projectedEndDate = computed(() => {
@@ -91,6 +106,39 @@ function formatDate(date: Date | null): string {
       <span class="progress-label">
         {{ completionPercent }}% complete
       </span>
+    </section>
+
+    <section class="timeline__tools">
+      <MiniCalendar
+        :model-value="miniDate"
+        @update:model-value="(d) => (miniDate = d)"
+        @select="(d) => { emit('update:viewDate', d); emit('jump', d) }"
+      />
+    </section>
+
+    <section class="timeline__calendars">
+      <h3>Calendars</h3>
+      <ul class="cal-list">
+        <li v-for="g in calendar.groupings" :key="g.key" class="cal-item">
+          <label class="cal-row">
+            <input
+              type="checkbox"
+              :checked="store.visibleGroupingKeys.includes(g.key)"
+              @change="store.setGroupingVisibility(g.key, ($event.target as HTMLInputElement).checked)"
+            />
+            <span class="swatch" :style="{ backgroundColor: g.color || '#64748b' }" />
+            <span class="cal-name">{{ g.name }}</span>
+            <input
+              class="color"
+              type="color"
+              :value="g.color || '#64748b'"
+              title="Color"
+              @input="(e) => { const v = (e.target as HTMLInputElement).value; store.updateGroupingColor(g.key, v); store.schedulePersistGroupingColor(g.key, v, 1200) }"
+              @change="(e) => { const v = (e.target as HTMLInputElement).value; store.persistGroupingColor(g.key, v) }"
+            />
+          </label>
+        </li>
+      </ul>
     </section>
 
     <section class="timeline__upcoming">
@@ -199,6 +247,23 @@ function formatDate(date: Date | null): string {
   display: grid;
   gap: 0.5rem;
 }
+
+.timeline__tools {
+  border-top: 1px solid var(--color-border);
+  padding-top: 0.75rem;
+}
+
+.timeline__calendars {
+  border-top: 1px solid var(--color-border);
+  padding-top: 0.75rem;
+  display: grid;
+  gap: 0.5rem;
+}
+.cal-list { list-style: none; padding: 0; margin: 0; display: grid; gap: 0.4rem; }
+.cal-item {}
+.cal-row { display: grid; grid-template-columns: auto auto 1fr auto; gap: 0.5rem; align-items: center; }
+.swatch { width: 0.8rem; height: 0.8rem; border-radius: 2px; border: 1px solid var(--color-border); }
+.color { inline-size: 2rem; block-size: 1.2rem; padding: 0; border: none; background: transparent; }
 
 .upcoming-day {
   width: 100%;

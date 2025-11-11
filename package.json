@@ -4,12 +4,20 @@
   "private": true,
   "type": "module",
   "engines": {
-    "node": "^20.19.0 || >=22.12.0"
+    "node": "^20.19.0 || >=22.12.0",
+    "bun": ">=1.1.0"
   },
+  "packageManager": "bun@1.1.29",
   "scripts": {
     "dev": "vite",
-    "dev:server": "tsx watch src/server/index.ts",
+    "dev:server": "bun --hot src/server/index.ts",
+    "dev:server:node": "tsx watch src/server/index.ts",
     "dev:full": "run-p dev dev:server",
+    "pw:install": "bunx playwright install --with-deps",
+    "test:ct": "bunx playwright test -c playwright-ct.config.ts",
+    "test:ct:ui": "bunx playwright test -c playwright-ct.config.ts --ui",
+    "test:e2e": "bunx playwright test -c playwright.config.ts",
+    "test:e2e:ui": "bunx playwright test -c playwright.config.ts --ui",
     "build": "run-s type-check build:all",
     "build:all": "run-s build:client build:server",
     "build:client": "vite build",
@@ -22,7 +30,8 @@
     "test:server": "vitest --config vitest.server.config.ts",
     "test": "run-p test:unit",
     "seed:sample": "tsx src/server/scripts/seedSampleCalendar.ts",
-    "start:server": "node dist/server/index.js"
+    "start:server": "node dist/server/index.js",
+    "start:server:bun": "bun dist/server/index.js"
   },
   "dependencies": {
     "@fastify/cors": "^10.0.2",
@@ -64,6 +73,8 @@
     "vite": "^7.1.11",
     "vite-plugin-vue-devtools": "^8.0.3",
     "vitest": "^3.2.4",
-    "vue-tsc": "^3.1.1"
+    "vue-tsc": "^3.1.1",
+    "@playwright/test": "^1.48.2",
+    "@playwright/experimental-ct-vue": "^1.48.2"
   }
 }

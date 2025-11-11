@@ -48,3 +48,22 @@ export const shiftCalendarDaysSchema = z.object({
 
 export type ShiftCalendarDaysInput = z.infer<typeof shiftCalendarDaysSchema>
 
+// Partial update schema for calendar settings (currently groupings metadata)
+export const updateCalendarSchema = z.object({
+  groupings: z
+    .array(
+      z.object({
+        key: z.string().min(1),
+        name: z.string().optional(),
+        color: z.string().optional(),
+        description: z.string().optional(),
+        autoShift: z.boolean().optional(),
+      })
+    )
+    .optional(),
+  includeWeekends: z.boolean().optional(),
+  includeHolidays: z.boolean().optional(),
+})
+
+export type UpdateCalendarInput = z.infer<typeof updateCalendarSchema>
+

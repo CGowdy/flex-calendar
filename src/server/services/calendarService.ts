@@ -18,6 +18,7 @@ import type {
 import type {
   CreateCalendarInput,
   ShiftCalendarDaysInput,
+  UpdateCalendarInput,
 } from '../schemas/calendarSchemas.js'
 import { addDays, nextSchoolDate } from '../utils/dateUtils.js'
 import { nanoid } from '../utils/id.js'
@@ -286,6 +287,49 @@ export async function shiftCalendarDays(
 
   calendar.markModified('days')
   await calendar.save()
+
+  return toCalendarDTO(calendar)
+}
+
+export async function updateCalendar(
+  calendarId: string,
+  payload: UpdateCalendarInput
+): Promise<CalendarDTO | null> {
+  if (!Types.ObjectId.isValid(calendarId)) {
+    return null
+  }
+
+  const calendar = await CalendarModel.findById(calendarId).exec()
+  if (!calendar) return null
+
+  let modified = false
+
+  if (payload.groupings && payload.groupings.length > 0) {
+    const byKey = new Map(calendar.groupings.map((g) => [g.key, g]))
+    for (const patch of payload.groupings) {
+      const target = byKey.get(patch.key)
+      if (!target) continue
+      if (typeof patch.name === 'string') target.name = patch.name
+      if (typeof patch.color === 'string') target.color = patch.color
+      if (typeof patch.description === 'string') target.description = patch.description
+      if (typeof patch.autoShift === 'boolean') target.autoShift = patch.autoShift
+      modified = true
+    }
+  }
+
+  if (typeof payload.includeWeekends === 'boolean') {
+    calendar.includeWeekends = payload.includeWeekends
+    modified = true
+  }
+  if (typeof payload.includeHolidays === 'boolean') {
+    calendar.includeHolidays = payload.includeHolidays
+    modified = true
+  }
+
+  if (modified) {
+    calendar.markModified('groupings')
+    await calendar.save()
+  }
 
   return toCalendarDTO(calendar)
 }

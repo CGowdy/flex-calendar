@@ -49,7 +49,7 @@ import { RouterLink, RouterView } from 'vue-router'
   justify-content: space-between;
   padding: 1rem 1.5rem;
   border-bottom: 1px solid var(--color-border);
-  background: rgba(255, 255, 255, 0.9);
+  background: var(--color-background-soft);
   backdrop-filter: blur(8px);
   position: sticky;
   top: 0;
@@ -84,16 +84,14 @@ import { RouterLink, RouterView } from 'vue-router'
 }
 
 .nav-link:hover {
-  background-color: rgba(37, 99, 235, 0.08);
-  color: #1d4ed8;
+  background-color: var(--color-background-mute);
 }
 
 .app-main {
   flex: 1 1 auto;
   padding: 1.5rem;
-  max-width: 1200px;
   width: 100%;
-  margin: 0 auto;
+  margin: 0;
   display: flex;
 }
 

@@ -1,0 +1,25 @@
+Project automation and environment rules for Cursor
+
+Docker and hot reload
+- For changes in src/**, rely on Vite HMR. Do not rebuild containers.
+- If the web UI does not reflect edits (common on Windows bind mounts), do:
+  1) docker-compose restart web
+  2) If still stale or after config changes, docker-compose up -d --build web
+- Rebuild web on edits to:
+  - package.json, package-lock.json, bun.lockb
+  - vite.config.ts, tailwind.config.ts, postcss.config.cjs
+  - tsconfig*.json
+  - docker-compose.yml
+  - .env, env.example
+
+Standard commands
+- Start stack: docker-compose up -d --build
+- Rebuild only web: docker-compose up -d --build web
+- Restart only web: docker-compose restart web
+- View logs: docker-compose logs -f web
+
+Agent workflow
+- After making config/dependency changes affecting the web dev server, immediately run “docker-compose up -d --build web”.
+- After typical code edits under src/**, do not rebuild; just refresh the browser. If the change is not detected within ~2 seconds, run “docker-compose restart web”.
+
+

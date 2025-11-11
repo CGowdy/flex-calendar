@@ -7,30 +7,30 @@ The app lets you import/seed schedules, manage multiple grouping tracks (Abeka, 
 
 - **Frontend:** Vue 3, TypeScript, Pinia, TanStack Query, Vite  
 - **Backend:** Fastify, Mongoose (MongoDB)  
-- **Tooling:** Vitest, Testing Library, ESLint, Prettier, Docker Compose
+- **Tooling:** Bun, Vitest, Testing Library, ESLint, Prettier, Docker Compose
 
 ## Getting Started
 
 ### Requirements
 
-- Node.js 20.19+ (or 22.12+)  
-- npm 10+  
+- Bun 1.1+  
+- Node.js 20.19+ (or 22.12+) optional for fallback  
 - Docker (optional, for containerized workflows)  
 - MongoDB (local or via Docker)
 
 ### Installation
 
 ```bash
-npm install
+bun install
 cp env.example .env # customise as needed
 ```
 
 ### Local Development
 
-Run the frontend and API together:
+Run the frontend and API together (Bun-first):
 
 ```bash
-npm run dev:full
+bun run dev:full
 ```
 
 - Frontend: http://localhost:5173  
@@ -39,8 +39,11 @@ npm run dev:full
 You can also run the dev servers individually:
 
 ```bash
-npm run dev        # frontend only
-npm run dev:server # backend API (tsx watch)
+bun run dev          # frontend only (Vite)
+bun run dev:server   # backend API (Bun TS runtime, hot reload)
+
+# Fallback (Node + tsx) if needed:
+npm run dev:server:node
 ```
 
 ### Docker Compose
@@ -51,20 +54,28 @@ A full stack (client, API, MongoDB) can be launched with:
 docker-compose up --build
 ```
 
-This mounts the current workspace; dependencies are installed inside the containers each time they start. Stop with `Ctrl+C` or `docker-compose down`.
+This mounts the current workspace; dependencies are installed inside the containers each time they start using Bun. Stop with `Ctrl+C` or `docker-compose down`.
 
 ## Scripts
 
 | Command | Description |
 | ------- | ----------- |
-| `npm run dev:full` | Run Vite and Fastify concurrently |
-| `npm run build` | Type-check and build both frontend and backend |
-| `npm run build:server` | Compile server TypeScript to `dist/server` |
-| `npm run start:server` | Run compiled Fastify server from `dist` |
-| `npm run seed:sample` | Seed MongoDB with a sample Abeka calendar |
-| `npm run test:unit` | Run frontend + backend Vitest suite |
-| `npm run test:server` | Run server-only tests with Node environment |
-| `npm run lint` | ESLint (auto-fix enabled) |
+| `bun run dev:full` | Run Vite and Fastify concurrently |
+| `bun run build` | Type-check and build both frontend and backend |
+| `bun run build:server` | Compile server TypeScript to `dist/server` |
+| `bun run start:server:bun` | Run compiled Fastify server with Bun |
+| `bun run seed:sample` | Seed MongoDB with a sample Abeka calendar |
+| `bun run test:unit` | Run frontend + backend Vitest suite |
+| `bun run test:server` | Run server-only tests with Node environment |
+| `bun run lint` | ESLint (auto-fix enabled) |
+
+### Component Tests (Playwright)
+
+- Install browsers once: `npx playwright install --with-deps`
+- Run headless: `bun run test:ct`
+- Run with UI: `bun run test:ct:ui`
+
+Playwright CT config lives in `playwright-ct.config.ts`. Tests are placed under `__ct__` folders and named `*.ct.spec.ts`. Example added for `SetupWizard.vue`.
 
 ## Testing
 
@@ -72,8 +83,8 @@ This mounts the current workspace; dependencies are installed inside the contain
 - Backend service tests live in `src/server/__tests__` and use `mongodb-memory-server` to avoid external dependencies.
 
 ```bash
-npm run test:unit    # all tests
-npm run test:server  # server-focused tests only
+bun run test:unit    # all tests
+bun run test:server  # server-focused tests only
 ```
 
 ## Project Structure Highlights
@@ -99,7 +110,7 @@ src/
 To insert a starter calendar (helpful for demos/testing):
 
 ```bash
-npm run seed:sample
+bun run seed:sample
 ```
 
 This uses the same `MONGODB_URI` configured for the API.
@@ -118,6 +129,14 @@ See `env.example` for defaults. Key values:
 - `SetupWizard` collects the basic calendar info and grouping tracks.  
 - The dashboard shows timeline stats, an interactive grouping grid, and a detail drawer for precise shifts.  
 - `useScheduleAdjuster` powers optimistic updates so UI interactions feel instant before API confirmation.
+
+## Intended Workflow
+
+See `docs/workflow.md` for a concise, repeatable workflow across devices/agents, including environment setup, local vs Docker dev flows, testing, and data seeding.
+
+## Product Spec
+
+See `docs/product-spec.md` for the problem statement, core flows, acceptance criteria, and milestones for this calendar.
 
 ## Next Steps
 
