@@ -19,7 +19,7 @@ const emit = defineEmits<{
 const store = useCalendarStore()
 
 // Keep a local month for the mini calendar so arrow navigation doesn't move the big calendar.
-let miniDate = ref(new Date(props.viewDate))
+const miniDate = ref(new Date(props.viewDate))
 watch(
   () => props.viewDate,
   (d) => {
