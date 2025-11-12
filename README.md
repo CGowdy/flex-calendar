@@ -46,6 +46,16 @@ bun run dev:full
 - API: http://localhost:3333 (Vite proxies `/api` → API)
  - Mongo Express: http://localhost:8081 (login user/pass: admin/admin)
 
+#### Switch between dev and full-stack envs
+
+```bash
+# Write dev-friendly .env (DB-only in Docker)
+scripts/switch-mode.sh dev
+
+# Write full-stack .env for NAS compose (mongo/api/web/caddy)
+scripts/switch-mode.sh full
+```
+
 ### NAS / “prod-ish” (full Docker stack)
 
 When you want to host on your NAS, use the full stack with Caddy reverse proxy:
@@ -56,6 +66,11 @@ docker compose -f docker-compose.full.yml up -d --build
 ```
 
 Edit `infra/Caddyfile` to use your NAS IP/hostname. Caddy routes `/api` to the API container and serves the SPA from the web container.
+
+### Continuous Integration
+
+GitHub Actions runs lint, type-check, unit + server tests, and build on pushes/PRs.
+- Workflow: `.github/workflows/ci.yml`
 
 ## Scripts
 
