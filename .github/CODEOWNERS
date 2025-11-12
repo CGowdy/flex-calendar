@@ -1,0 +1,3 @@
+# Code owners for the entire repository
+# When branch protection requires code owner review, PRs will request these users.
+* @cgowdy @nolic0321
