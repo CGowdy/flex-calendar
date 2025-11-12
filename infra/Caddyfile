@@ -1,0 +1,18 @@
+# Replace 192.168.1.50 with your NAS IP or hostname
+http://192.168.1.50 {
+  @api path /api*
+  handle @api {
+    reverse_proxy api:3333
+  }
+  handle {
+    reverse_proxy web:80
+  }
+}
+
+# Example for a real domain with HTTPS later
+# yourdomain.com {
+#   encode gzip
+#   @api path /api*
+#   handle @api { reverse_proxy api:3333 }
+#   handle { reverse_proxy web:80 }
+# }
