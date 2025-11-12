@@ -5,7 +5,7 @@ import type {
   Calendar,
   CalendarDay,
   ShiftCalendarDaysRequest,
-} from '../types/calendar'
+} from '@/features/calendar/types/calendar'
 
 const props = defineProps<{
   open: boolean

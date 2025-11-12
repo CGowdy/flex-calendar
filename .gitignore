@@ -1,3 +1,33 @@
+# Dependencies
+node_modules/
+
+# Build outputs
+dist/
+dist-ssr/
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Logs and caches
+*.log
+*.log.*
+.eslintcache
+.cache/
+
+# Playwright
+playwright-report/
+test-results/
+
+# OS junk
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+.vscode/
+
 # Logs
 logs
 *.log

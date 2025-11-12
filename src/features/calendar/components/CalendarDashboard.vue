@@ -2,7 +2,7 @@
 import { computed, onMounted, ref, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 
-import { useCalendarStore } from '../stores/useCalendarStore'
+import { useCalendarStore } from '@stores/useCalendarStore'
 import SetupWizard from './SetupWizard.vue'
 import CalendarTimeline from './CalendarTimeline.vue'
 import DraggableCalendarGrid from './DraggableCalendarGrid.vue'
@@ -14,7 +14,7 @@ import type {
   CalendarDay,
   CreateCalendarRequest,
   ShiftCalendarDaysRequest,
-} from '../types/calendar'
+} from '@/features/calendar/types/calendar'
 
 const calendarStore = useCalendarStore()
 const {
