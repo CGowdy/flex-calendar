@@ -23,6 +23,148 @@ Agent workflow
 - After typical code edits under src/**, do not rebuild; just refresh the browser. If the change is not detected within ~2 seconds, run “docker-compose restart web”.
 
 
+# AI Agent Repository Rules (Vue-First Edition)
+
+## 0) Solo-Maintainability Defaults (you are the only dev)
+- Prefer boring, conventional solutions over clever abstractions.
+- Optimize for *future you*: fewer files, fewer layers, fewer concepts to recall.
+- Avoid hidden magic and deep indirection; make data flow explicit.
+- If two patterns are similar in quality, **choose the simpler one**.
+- Keep dependencies lean; prefer first-party or standard libs over niche packages.
+- Co-locate code and tests with their feature. Avoid cross-feature coupling.
+- Leave a 3–5 line **ADR-lite** note with major changes: *Context → Decision → Consequences* (top of the PR or file header).
+- Name things literally; favor `UsersTable.vue` over `SmartList.vue`.
+- Add `// WHY:` comments sparingly where intent is non-obvious.
+- Create/maintain a `DOCS/HowTo.md` with copy-pasta snippets for recurring tasks (new component, new route, new store).
+
+## 1) UI Verification Policy (95% confidence)
+- For any change that impacts UI/UX (HTML/CSS/JS/Vue templates, styles, assets, routing):
+  - Open the affected page(s) in the browser.
+  - Visually verify layout, spacing, overflow, responsiveness, and interactions.
+  - If print output is relevant, check @media print rendering.
+  - Re-check after each non-trivial edit until there is 95% confidence the result matches requirements.
+  - Prefer realistic data and edge cases (long text, missing images, small screens) during verification.
+
+## 2) Clarification Policy (95% confidence)
+- Before implementing, ask targeted questions until 95% confident about scope, constraints, and success criteria.
+- If unknowns remain (e.g., dimensions, DPI targets, asset paths, accessibility, browser support), surface them proactively and propose sensible defaults.
+
+## 3) Evidence & Feedback Loop
+- When feasible, include brief browser verification notes (what was checked) and call out remaining risks.
+- Default to high-signal, minimal commentary; focus on outcome and any unresolved edge cases.
+
+## 4) Safety & Non-regression
+- Avoid breaking unrelated pages/components. If risk exists, mention it and add quick checks.
+- Respect repository linting/formatting rules; resolve new lints before finishing.
+
+## 5) Prioritization
+- Prioritize user-visible correctness over micro-optimizations.
+- Prefer incremental changes with frequent verification, especially for UI.
+
+---
+
+## 6) Testing Policy (Quality Bar)
+
+Every feature, bug fix, or refactor must include or update tests.  
+Prefer fast, meaningful tests over brittle or overly mocked tests.
+
+### 6.1 Unit/Component Tests (default)
+- Use **Vitest** with **Vue Testing Library**.
+- Follow Testing Library principles: test via user-observable behavior (roles, labels, text), not implementation details.
+- Prefer queries like `getByRole`, `getByLabelText`, and `getByText`; avoid `getByTestId` unless necessary.
+- Use `user-event` style interactions; assert on visible outcomes and ARIA state.
+- Co-locate component tests next to the component or in `tests/unit` with matching filename patterns.
+- Mock network with **MSW** where appropriate; avoid deep mocking of framework internals.
+
+### 6.2 End-to-End Tests (front-end flows)
+- Use **Playwright** for E2E. Target key user journeys and smoke paths.
+- Run headless in CI with a small cross-browser matrix (Chromium minimum; add WebKit/Firefox when feasible).
+- Prefer stable selectors (roles/labels) over brittle CSS/XPath.
+- Include accessibility checks where practical (landmarks/roles/contrast assertions or axe where available).
+
+### 6.3 Print and Rendering Checks
+- For features that affect print, add Playwright screenshot assertions for `@media print` layouts or PDF snapshot diff where feasible.
+
+### 6.4 Coverage & Gates
+- Aim for ≥80% global coverage and meaningful coverage on changed files; do not chase coverage at the expense of test quality.
+- CI must run: type-check, lint, unit/component tests, and E2E smoke; fail the build on red.
+
+### 6.5 Test Organization & Naming
+- `tests/unit` and `tests/e2e` directories (or co-located `__tests__`) with clear, action-oriented names.
+- Keep tests deterministic; avoid time/date randomness without fixed seeds.
+
+---
+
+## 7) Vue 3 Development & Architecture Rules
+
+### General Principles
+- Default to **TypeScript** everywhere.
+- Prefer composable, readable solutions over large, monolithic components.
+- Keep components small and focused.
+- Extract shared logic into composables, services, or stores where it improves clarity.
+- Follow the project’s naming, file, and folder conventions before introducing new ones.
+- Be honest about tradeoffs and suggest cleaner alternatives if a pattern feels off.
+
+### Vue Patterns
+- Use **Vue 3** with `<script setup>` and the **Composition API**.
+- Define props/emits with `defineProps` / `defineEmits` and strong types.
+- Organize features like:
+src/
+features/
+<feature>/
+components/
+composables/
+stores/
+services/
+
+markdown
+Copy code
+- Keep templates presentational; move logic into script or composables.
+- Prefer slots and composition patterns over prop overloads.
+- Use **Pinia** (or equivalent) for global state.
+- Keep API interaction centralized in services or **TanStack Query** hooks, not scattered fetch calls.
+- Co-locate types/interfaces near usage or in `src/types`.
+
+### TypeScript
+- Use strict mode.
+- Type public APIs, props, emits, and return values clearly.
+- Use discriminated unions or generics instead of `any`.
+- Let inference work inside implementation for cleaner code.
+
+### Performance & DX
+- Readability > micro-optimization unless performance is a proven bottleneck.
+- Favor incremental refactors over full rewrites.
+- When generating code, ensure it matches lint/prettier setup automatically.
+- Prefer *framework-native* solutions before adding libraries.
+
+---
+
+## 8) AI Collaboration Behavior
+
+### When the AI Writes Code
+1. Summarize the plan in 3–5 bullets first.  
+2. Implement code that fits the repo’s structure and naming.  
+3. Keep diffs tight; do not rewrite unrelated files.  
+4. After implementation, summarize what changed and why.  
+5. Suggest (but don’t auto-commit) optional refactors or tests.  
+6. If multiple approaches are viable, **pick the one that’s easiest to maintain solo** and note the tradeoff in one line.
+
+### When the AI Explains Code
+- Give concise, senior-level explanations focusing on architecture, tradeoffs, and reasoning.
+- Skip syntax tutorials; explain *why*, not *how*.
+- When relevant, note potential improvements or cleaner idioms.
+
+---
+
+## ✅ TL;DR Summary for Cursor Agent
+- This is a **Vue 3 + TypeScript** repository maintained by a **solo developer**.
+- Prefer conventional, minimal, and explicit patterns that are easy to revisit.
+- Apply 95% verification & clarification policies before major changes.
+- Follow Testing Library + Playwright testing principles.
+- Default to Composition API, Pinia for state, and feature-based structure.
+- Keep dependencies lean, code TypeScript-strict, and changes well-scoped.
+- Communicate briefly; choose the simplest maintainable solution when in doubt.
+
 ## 9) Docker & Dev Server Rules
 
 - Dev default: Run DB in Docker only; run API and Web natively with hot reload.

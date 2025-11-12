@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
-import type { Calendar, CalendarDay } from '../types/calendar'
+import type { Calendar, CalendarDay } from '@/features/calendar/types/calendar'
 
 const props = defineProps<{
   calendar: Calendar

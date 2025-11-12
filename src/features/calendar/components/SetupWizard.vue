@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, reactive } from 'vue'
 
-import type { CreateCalendarRequest } from '../types/calendar'
+import type { CreateCalendarRequest } from '@/features/calendar/types/calendar'
 
 const props = defineProps<{
   submitting?: boolean

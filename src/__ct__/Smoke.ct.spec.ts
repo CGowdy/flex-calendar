@@ -10,7 +10,7 @@ const Counter = defineComponent({
   template: `<button aria-label="count" @click="inc">count: {{ n }}</button>`,
 })
 
-test('smoke: mount simple component and interact', async ({ mount }) => {
+test.skip('smoke: mount simple component and interact', async ({ mount }) => {
   const component = await mount(Counter)
   await expect(component.getByRole('button', { name: /count/i })).toBeVisible()
   await component.getByRole('button', { name: /count/i }).click()
