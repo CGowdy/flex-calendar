@@ -12,9 +12,6 @@ const emit = defineEmits<{
 function startOfMonth(d: Date) {
   const x = new Date(d); x.setDate(1); x.setHours(0,0,0,0); return x
 }
-function endOfMonth(d: Date) {
-  const x = new Date(d); x.setMonth(x.getMonth()+1,0); x.setHours(0,0,0,0); return x
-}
 function addDays(d: Date, n: number) {
   const x = new Date(d); x.setDate(x.getDate()+n); return x
 }
@@ -25,7 +22,6 @@ function sameDay(a: Date, b: Date) {
 const today = new Date()
 const weeks = computed(() => {
   const start = startOfMonth(props.modelValue)
-  const end = endOfMonth(props.modelValue)
   const gridStart = addDays(start, -start.getDay())
   const days = Array.from({ length: 42 }, (_, i) => addDays(gridStart, i))
   const rows: Date[][] = []

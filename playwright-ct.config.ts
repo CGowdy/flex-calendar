@@ -1,6 +1,5 @@
 import { defineConfig } from '@playwright/experimental-ct-vue'
 import vue from '@vitejs/plugin-vue'
-import vueDevTools from 'vite-plugin-vue-devtools'
 import path from 'node:path'
 import { fileURLToPath, URL } from 'node:url'
 
