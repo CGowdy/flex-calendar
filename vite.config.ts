@@ -17,7 +17,13 @@ export default defineConfig({
   ],
   resolve: {
     alias: {
-      '@': fileURLToPath(new URL('./src', import.meta.url))
+      '@': fileURLToPath(new URL('./src', import.meta.url)),
+      '@api': fileURLToPath(new URL('./src/features/calendar/api', import.meta.url)),
+      '@components': fileURLToPath(new URL('./src/features/calendar/components', import.meta.url)),
+      '@composables': fileURLToPath(new URL('./src/features/calendar/composables', import.meta.url)),
+      '@stores': fileURLToPath(new URL('./src/features/calendar/stores', import.meta.url)),
+      '@views': fileURLToPath(new URL('./src/features/calendar/views', import.meta.url)),
+      '@lib': fileURLToPath(new URL('./src/lib', import.meta.url)),
     },
   },
   server: {

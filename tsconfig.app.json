@@ -6,7 +6,13 @@
     "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.app.tsbuildinfo",
 
     "paths": {
-      "@/*": ["./src/*"]
+      "@/*": ["./src/*"],
+      "@api/*": ["./src/features/calendar/api/*"],
+      "@components/*": ["./src/features/calendar/components/*"],
+      "@composables/*": ["./src/features/calendar/composables/*"],
+      "@stores/*": ["./src/features/calendar/stores/*"],
+      "@views/*": ["./src/features/calendar/views/*"],
+      "@lib/*": ["./src/lib/*"]
     }
   }
 }

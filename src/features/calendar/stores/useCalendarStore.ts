@@ -7,14 +7,14 @@ import {
   fetchCalendars,
   shiftCalendarDays,
   updateCalendarMeta,
-} from '../api/calendarApi'
+} from '@api/calendarApi'
 import type {
   Calendar,
   CalendarDay,
   CalendarSummary,
   CreateCalendarRequest,
   ShiftCalendarDaysRequest,
-} from '../types/calendar'
+} from '@/features/calendar/types/calendar'
 import { useScheduleAdjuster } from '../composables/useScheduleAdjuster'
 
 interface LoadOptions {
