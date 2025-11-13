@@ -164,3 +164,19 @@ Copy code
 - Default to Composition API, Pinia for state, and feature-based structure.
 - Keep dependencies lean, code TypeScript-strict, and changes well-scoped.
 - Communicate briefly; choose the simplest maintainable solution when in doubt.
+
+## 9) Docker & Dev Server Rules
+
+- Dev default: Run DB in Docker only; run API and Web natively with hot reload.
+  - Compose file: `infra/docker-compose.dev.yml`
+  - Start DB: `docker compose -f infra/docker-compose.dev.yml up -d`
+  - After edits under `src/**`, do not rebuild containers; rely on Vite and Bun hot reload.
+  - If the web UI doesn’t reflect edits within ~2s, refresh the browser first. Mongo Express can be restarted with: `docker compose -f infra/docker-compose.dev.yml restart mongo-express`.
+
+- NAS/full mode: Use `infra/docker-compose.full.yml` with Caddy reverse proxy.
+  - Web is built to static and served by nginx; API is exposed behind `/api` via Caddy.
+  - Keep environment in `.env` and `.env.mongo`. Do not hardcode secrets in Dockerfiles.
+
+- Rebuild policy:
+  - Only rebuild containers in full mode when editing config/dependencies.
+  - Rebuild a single service: `docker compose -f infra/docker-compose.full.yml up -d --build web` (or `api`).

@@ -7,9 +7,7 @@ const props = defineProps<{
   selectedDayId: string | null
 }>()
 
-const emit = defineEmits<{
-  (event: 'select-day', dayId: string): void
-}>()
+// No emits for now
 
 const selectedDay = computed<CalendarDay | null>(() => {
   if (!props.selectedDayId) return null

@@ -5,10 +5,11 @@ let memoryServer: MongoMemoryServer
 
 let connectToDatabase: () => Promise<typeof import('mongoose')>
 let disconnectFromDatabase: () => Promise<void>
-let createCalendar: typeof import('../services/calendarService').createCalendar
-let shiftCalendarDays: typeof import('../services/calendarService').shiftCalendarDays
-let getCalendarById: typeof import('../services/calendarService').getCalendarById
-let CalendarModel: typeof import('../models/calendarModel').CalendarModel
+let createCalendar: typeof import('../services/calendarService.js').createCalendar
+let shiftCalendarDays: typeof import('../services/calendarService.js').shiftCalendarDays
+let getCalendarById: typeof import('../services/calendarService.js').getCalendarById
+let CalendarModel: typeof import('../models/calendarModel.js').CalendarModel
+import type { CalendarDTO } from '../types/calendar.js'
 
 beforeAll(async () => {
   memoryServer = await MongoMemoryServer.create()
@@ -45,6 +46,7 @@ describe('calendarService.shiftCalendarDays', () => {
       startDate: new Date('2025-08-04').toISOString(),
       totalDays: 10,
       includeWeekends: false,
+      includeHolidays: false,
       groupings: [
         { key: 'abeka', name: 'Abeka', autoShift: true },
         { key: 'student-a', name: 'Student A', autoShift: true },
@@ -70,7 +72,7 @@ describe('calendarService.shiftCalendarDays', () => {
     expect(refreshed).not.toBeNull()
 
     const shiftedAbekaDay = refreshed!.days.find(
-      (day) => day.groupingKey === 'abeka' && day.groupingSequence === 3
+      (day: CalendarDTO['days'][number]) => day.groupingKey === 'abeka' && day.groupingSequence === 3
     )
     expect(shiftedAbekaDay).toBeDefined()
     expect(new Date(shiftedAbekaDay!.date).getTime()).toBe(
@@ -78,7 +80,7 @@ describe('calendarService.shiftCalendarDays', () => {
     )
 
     const shiftedStudentDay = refreshed!.days.find(
-      (day) => day.groupingKey === 'student-a' && day.groupingSequence === 3
+      (day: CalendarDTO['days'][number]) => day.groupingKey === 'student-a' && day.groupingSequence === 3
     )
     expect(shiftedStudentDay).toBeDefined()
     expect(new Date(shiftedStudentDay!.date).getTime()).toBe(
@@ -87,7 +89,7 @@ describe('calendarService.shiftCalendarDays', () => {
     )
 
     const holidayDay = refreshed!.days.find(
-      (day) => day.groupingKey === 'holidays' && day.groupingSequence === 3
+      (day: CalendarDTO['days'][number]) => day.groupingKey === 'holidays' && day.groupingSequence === 3
     )
     if (holidayDay) {
       const originalHoliday = calendar.days.find(
@@ -103,8 +105,11 @@ describe('calendarService.shiftCalendarDays', () => {
   it('limits shifts to explicit grouping keys', async () => {
     const calendar = await createCalendar({
       name: 'Partial Shift',
+      source: 'custom',
       startDate: new Date('2025-08-04').toISOString(),
       totalDays: 5,
+      includeWeekends: false,
+      includeHolidays: false,
       groupings: [
         { key: 'abeka', name: 'Abeka', autoShift: true },
         { key: 'student-b', name: 'Student B', autoShift: true },
@@ -112,12 +117,12 @@ describe('calendarService.shiftCalendarDays', () => {
     })
 
     const dayToShift = calendar.days.find(
-      (day) => day.groupingKey === 'abeka' && day.groupingSequence === 2
+      (day: CalendarDTO['days'][number]) => day.groupingKey === 'abeka' && day.groupingSequence === 2
     )
     expect(dayToShift).toBeDefined()
 
     const studentDayBefore = calendar.days.find(
-      (day) => day.groupingKey === 'student-b' && day.groupingSequence === 2
+      (day: CalendarDTO['days'][number]) => day.groupingKey === 'student-b' && day.groupingSequence === 2
     )
 
     await shiftCalendarDays(calendar.id, {
@@ -130,7 +135,7 @@ describe('calendarService.shiftCalendarDays', () => {
     expect(refreshed).not.toBeNull()
 
     const updatedStudentDay = refreshed!.days.find(
-      (day) => day.groupingKey === 'student-b' && day.groupingSequence === 2
+      (day: CalendarDTO['days'][number]) => day.groupingKey === 'student-b' && day.groupingSequence === 2
     )
     expect(updatedStudentDay).toBeDefined()
     expect(new Date(updatedStudentDay!.date).toISOString()).toBe(

@@ -11,7 +11,6 @@ import WeekCalendar from './WeekCalendar.vue'
 import DayCalendar from './DayCalendar.vue'
 import type {
   Calendar,
-  CalendarDay,
   CreateCalendarRequest,
   ShiftCalendarDaysRequest,
 } from '@/features/calendar/types/calendar'
@@ -35,15 +34,6 @@ const selectedCalendar = computed<Calendar | null>(() => activeCalendar.value ??
 const viewMode = ref<'month' | 'week' | 'day' | 'board'>('month')
 const viewDate = ref<Date>(new Date())
 
-const selectedDay = computed<CalendarDay | null>(() => {
-  if (!selectedCalendar.value || !selectedDayId.value) {
-    return null
-  }
-  return (
-    selectedCalendar.value.days.find((day) => day.id === selectedDayId.value) ??
-    null
-  )
-})
 
 const hasCalendars = computed(() => calendars.value.length > 0)
 const isBusy = computed(

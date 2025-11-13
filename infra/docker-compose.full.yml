@@ -1,0 +1,55 @@
+version: "3.9"
+
+networks:
+  webnet:
+
+volumes:
+  mongo-data:
+  caddy-data:
+  caddy-config:
+
+services:
+  mongo:
+    image: mongo:7
+    restart: unless-stopped
+    env_file:
+      - ../.env.mongo
+    networks: [webnet]
+    volumes:
+      - mongo-data:/data/db
+
+  api:
+    build:
+      context: ..
+      dockerfile: Dockerfile.api
+    env_file:
+      - ../.env
+    environment:
+      - PORT=${PORT:-3333}
+      - HOST=0.0.0.0
+      # Ensure MONGODB_URI is provided in .env; example:
+      # MONGODB_URI=mongodb://root:example@mongo:27017/my-abeka-calendar?authMechanism=DEFAULT
+    depends_on:
+      - mongo
+    networks: [webnet]
+
+  web:
+    build:
+      context: ..
+      dockerfile: Dockerfile.web
+    networks: [webnet]
+
+  caddy:
+    image: caddy:2
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on:
+      - web
+      - api
+    networks: [webnet]

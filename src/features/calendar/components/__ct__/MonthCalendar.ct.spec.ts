@@ -63,7 +63,7 @@ test.describe('MonthCalendar', () => {
         selectedDayId: null,
         viewDate: new Date('2025-11-10T00:00:00.000Z'),
         visibleGroupingKeys: ['abeka'],
-        onSelectDay: (id: string) => emitted.push(id),
+        'onSelect-day': (id: string) => emitted.push(id),
       },
     })
 

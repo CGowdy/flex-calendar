@@ -25,36 +25,52 @@ bun install
 cp env.example .env # customise as needed
 ```
 
-### Local Development
+### Local Development (fastest): DB in Docker, FE/BE native
 
-Run the frontend and API together (Bun-first):
+1) Start MongoDB (and mongo-express UI):
+
+```bash
+docker compose -f infra/docker-compose.dev.yml up -d
+```
+
+2) Run the API and Web with hot-reload:
 
 ```bash
 bun run dev:full
+# or separately:
+# bun run dev          # web only (Vite)
+# bun run dev:server   # api only (Bun runtime)
 ```
 
 - Frontend: http://localhost:5173  
-- API: http://localhost:3333 (proxied at `/api` from the Vite dev server)
+- API: http://localhost:3333 (Vite proxies `/api` → API)
+ - Mongo Express: http://localhost:8081 (login user/pass: admin/admin)
 
-You can also run the dev servers individually:
-
-```bash
-bun run dev          # frontend only (Vite)
-bun run dev:server   # backend API (Bun TS runtime, hot reload)
-
-# Fallback (Node + tsx) if needed:
-npm run dev:server:node
-```
-
-### Docker Compose
-
-A full stack (client, API, MongoDB) can be launched with:
+#### Switch between dev and full-stack envs
 
 ```bash
-docker-compose up --build
+# Write dev-friendly .env (DB-only in Docker)
+scripts/switch-mode.sh dev
+
+# Write full-stack .env for NAS compose (mongo/api/web/caddy)
+scripts/switch-mode.sh full
 ```
 
-This mounts the current workspace; dependencies are installed inside the containers each time they start using Bun. Stop with `Ctrl+C` or `docker-compose down`.
+### NAS / “prod-ish” (full Docker stack)
+
+When you want to host on your NAS, use the full stack with Caddy reverse proxy:
+
+```bash
+cd infra
+docker compose -f docker-compose.full.yml up -d --build
+```
+
+Edit `infra/Caddyfile` to use your NAS IP/hostname. Caddy routes `/api` to the API container and serves the SPA from the web container.
+
+### Continuous Integration
+
+GitHub Actions runs lint, type-check, unit + server tests, and build on pushes/PRs.
+- Workflow: `.github/workflows/ci.yml`
 
 ## Scripts
 
@@ -119,10 +135,10 @@ This uses the same `MONGODB_URI` configured for the API.
 
 See `env.example` for defaults. Key values:
 
-- `MONGODB_URI` – Mongo connection string  
+- `MONGODB_URI` – Mongo connection string (dev: `mongodb://root:example@localhost:27017/my-abeka-calendar?authMechanism=DEFAULT`)  
 - `PORT` / `HOST` – Fastify listener  
-- `CORS_ORIGIN` – Allowed origins for dev  
-- `VITE_API_URL` – Optional override when the frontend isn’t using the Vite proxy
+- `CORS_ORIGIN` – Optional in dev (Vite proxy handles same-origin)  
+- `VITE_API_URL` – Optional override when not using the Vite proxy
 
 ## Accessibility & UI Verification
 
