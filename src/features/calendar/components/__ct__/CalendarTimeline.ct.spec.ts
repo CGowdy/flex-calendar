@@ -2,6 +2,7 @@ import { test, expect } from '@playwright/experimental-ct-vue'
 import CalendarTimeline from '../CalendarTimeline.vue'
 import type { Calendar } from '../../types/calendar'
 import { createPinia } from 'pinia'
+import type { App } from 'vue'
 
 function makeCalendar(): Calendar {
   return {
@@ -50,7 +51,7 @@ test.skip('renders calendars list and mini calendar', async ({ mount }) => {
       onJump: () => {},
     },
     hooks: {
-      async beforeMount(app: any) {
+      async beforeMount(app: App) {
         app.use(createPinia())
       },
     },

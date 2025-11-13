@@ -35,10 +35,17 @@ describe('SetupWizard', () => {
     const submitButton = screen.getByRole('button', { name: /save calendar/i })
     await user.click(submitButton)
 
-    const submitEvents = emitted().submit as any
+    const submitEvents = emitted().submit as unknown[][] | undefined
     expect(submitEvents).toBeTruthy()
-
-    const payload = submitEvents![0][0] as any
+    if (!submitEvents || submitEvents.length === 0 || (submitEvents[0] as unknown[] | undefined)?.length === 0) {
+      throw new Error('expected submit events')
+    }
+    const first = submitEvents[0] as unknown[]
+    const payload = first[0] as {
+      name: string
+      totalDays: number
+      groupings: Array<{ key: string; autoShift: boolean }>
+    }
     expect(payload.name).toBe('Family Plan')
     expect(payload.totalDays).toBe(180)
     expect(payload.groupings).toEqual(
