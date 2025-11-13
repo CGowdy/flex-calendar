@@ -4,6 +4,8 @@ import { nanoid } from '../utils/id.js'
 
 export interface CalendarEvent {
   _id: string
+  // Optional client-facing id used after toJSON normalization
+  id?: string
   title: string
   description: string
   durationDays: number
@@ -200,7 +202,7 @@ CalendarSchema.set('toJSON', {
   virtuals: true,
   versionKey: false,
   transform: (_doc, ret) => {
-    const calendarRet = ret as Record<string, unknown> & {
+    const calendarRet = (ret as unknown) as Record<string, unknown> & {
       _id?: string
       id?: string
       days?: CalendarDayWithInternalIds[]
@@ -215,18 +217,18 @@ CalendarSchema.set('toJSON', {
       calendarRet.days = calendarRet.days.map((day) => {
         const normalizedEvents = Array.isArray(day.events)
           ? day.events.map((event) => ({
-              ...event,
-              id: event.id ?? event._id ?? nanoid(),
+              ...((event as unknown) as Record<string, unknown>),
+              id: (event as CalendarEvent).id ?? (event as CalendarEvent)._id ?? nanoid(),
               _id: undefined,
             }))
           : []
 
         return {
-          ...day,
-          id: day.id ?? day._id ?? nanoid(),
+          ...((day as unknown) as Record<string, unknown>),
+          id: (day as CalendarDayWithInternalIds).id ?? (day as CalendarDayWithInternalIds)._id ?? nanoid(),
           _id: undefined,
-          events: normalizedEvents,
-        }
+          events: normalizedEvents as unknown as CalendarEvent[],
+        } as unknown as CalendarDayWithInternalIds
       })
     }
 
