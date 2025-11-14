@@ -81,6 +81,12 @@ bun run seed:sample
 - Vite dev server: `http://localhost:5173`
 - API server: `http://localhost:3333`
 - Vite proxy forwards `/api` to the API target (`VITE_API_URL`, defaults to API server).
+  - Health check is at `/health` (not `/api/health`).
+  - Calendars API is under `/api/calendars`. Leave `VITE_API_URL` unset to use the proxy, or if you set it, include the `/api` suffix, e.g. `http://localhost:3333/api`.
+
+Auth note for Mongo (dev):
+- When using Dockerized Mongo with the root user from `.env.mongo`, use `authSource=admin` in `MONGODB_URI`, e.g.  
+  `mongodb://root:example@localhost:27017/my-abeka-calendar?authSource=admin&authMechanism=DEFAULT`
 
 ## Branching and PRs (Lightweight)
 
