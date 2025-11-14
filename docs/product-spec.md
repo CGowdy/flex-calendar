@@ -2,6 +2,11 @@
 
 A planning tool to align homeschooling days with the Abeka reference schedule while adapting to real-life changes (late starts, holidays, sick days, and catch-up plans).
 
+> **ADR-lite (2025-11-14)**
+> Context: Chain-move reflow now respects weekends/holidays.
+> Decision: Update implementation status + roadmap emphasis (holiday CRUD, Abeka delta).
+> Consequences: MVP focus shifts to data/UX gaps instead of core chaining behavior.
+
 ## Status Legend
 
 - [ ] Planned
@@ -9,21 +14,28 @@ A planning tool to align homeschooling days with the Abeka reference schedule wh
 
 ## Implementation Status
 
-- [ ] Setup Wizard: generate plan (days, weekdays, holidays, labels)
-- [ ] Chain Move with reflow (drag/drop or date change)
-- [ ] Patterned labeling with tokens (e.g., "Day {number}")
-- [ ] Holidays: add/remove and reflow schedule
-- [ ] Catch-up Planner: rules, forecast, apply
-- [ ] Sick/Off days marking and reflow
-- [ ] Timeline/Dashboard with Abeka delta and projections
-- [ ] Per-student calendars (Abeka, Holidays, Student A/B/C)
-- [ ] Calendar-level chaining toggle (`isChained`); Holidays non-chained
-- [ ] Fractional days via split (1 of 2, 2 of 2)
-- [ ] ICS export (subscribe in Google/iCal)
+- [~] Setup Wizard: generate plan (days, weekdays, labels) - **~70%**: Holiday exclusion helpers exist server-side, but the wizard still lacks holiday inputs/ICS import.
+- [x] Chain Move with reflow (drag/drop or date change) - **~85%**: Smart reflow skips weekends + holidays; still needs date picker + collision handling.
+- [x] Patterned labeling with tokens (e.g., "Day {number}") - **~80%**: Basic {n} token works
+- [ ] Holidays: add/remove and reflow schedule - **~20%**: No holiday CRUD UI/API; exclusion depends on nonexistent data.
+- [ ] Catch-up Planner: rules, forecast, apply - **0%**: Not started
+- [ ] Sick/Off days marking and reflow - **0%**: Not started
+- [~] Timeline/Dashboard with Abeka delta and projections - **~30%**: Basic stats exist, but no Abeka comparison/delta
+- [x] Per-student calendars (Abeka, Holidays, Student A/B/C) - **~90%**: Groupings work, but no Abeka reference tracking
+- [x] Calendar-level chaining toggle (`isChained`); Holidays non-chained - **~95%**: `autoShift` property works and smart reflow honors it; still needs holiday CRUD to make exclusions meaningful.
+- [ ] Fractional days via split (1 of 2, 2 of 2) - **0%**: Not started
+- [ ] ICS export (subscribe in Google/iCal) - **0%**: Future (v1.2)
 
 Implemented (Infrastructure/Docs)
 - [x] Bun-first dev workflow and Docker Compose
 - [x] Workflow and Product Spec documentation
+- [x] Fastify API server with MongoDB persistence
+- [x] Vue 3 + TypeScript frontend with Pinia store
+- [x] Basic calendar CRUD operations
+- [x] Drag-and-drop in month view
+- [x] Multiple calendar/grouping support
+
+**See `docs/implementation-status.md` for detailed analysis.**
 
 ## Purpose
 

@@ -20,7 +20,14 @@ import type {
   ShiftCalendarDaysInput,
   UpdateCalendarInput,
 } from '../schemas/calendarSchemas.js'
-import { addDays, nextSchoolDate } from '../utils/dateUtils.js'
+import {
+  addDays,
+  addValidSchoolDays,
+  countValidDaySpan,
+  generateValidSchoolDates,
+  getHolidayDates,
+  nextSchoolDate,
+} from '../utils/dateUtils.js'
 import { nanoid } from '../utils/id.js'
 
 type CalendarDaySubdocument = CalendarDocument['days'][number]
@@ -137,12 +144,20 @@ function generateDaysForGrouping({
   includeWeekends,
   titlePattern,
   eventsForGrouping,
-}: GenerateDaysParams): CalendarDay[] {
+  holidayDates,
+}: GenerateDaysParams & { holidayDates?: Set<string> }): CalendarDay[] {
   const days: CalendarDay[] = []
-  let cursor = new Date(startDate)
+
+  // Generate all valid school dates upfront
+  const validDates = generateValidSchoolDates(
+    startDate,
+    totalDays,
+    includeWeekends,
+    holidayDates
+  )
 
   for (let index = 0; index < totalDays; index += 1) {
-    const schoolDate = nextSchoolDate(cursor, includeWeekends)
+    const schoolDate = validDates[index]!
     const groupingSequence = index + 1
 
     const templateEvent = eventsForGrouping[groupingSequence - 1]
@@ -170,8 +185,6 @@ function generateDaysForGrouping({
       notes: '',
       events,
     })
-
-    cursor = addDays(schoolDate, 1)
   }
 
   return days
@@ -214,7 +227,21 @@ export async function createCalendar(
     (payload.groupings ?? []).map((g) => [g.key, g.titlePattern])
   )
 
-  const days = groupings.flatMap((grouping) =>
+  // Generate holidays grouping first (if selected) to get holiday dates
+  const holidaysGrouping = groupings.find((g) => g.key === 'holidays')
+  const holidayDays: CalendarDay[] = []
+  if (holidaysGrouping) {
+    // For now, holidays grouping is created but empty - user will add holidays later
+    // This allows us to get the holiday dates set (empty initially)
+  }
+
+  // Get holiday dates from any pre-existing holiday days
+  // (For initial creation, this will be empty, but structure supports future holiday import)
+  const holidayDates = getHolidayDates(holidayDays)
+
+  // Generate days for non-holiday groupings, excluding holiday dates
+  const nonHolidayGroupings = groupings.filter((g) => g.key !== 'holidays')
+  const days = nonHolidayGroupings.flatMap((grouping) =>
     generateDaysForGrouping({
       groupingKey: grouping.key,
       groupingName: grouping.name,
@@ -223,8 +250,12 @@ export async function createCalendar(
       totalDays,
       titlePattern: groupingPatternByKey.get(grouping.key),
       eventsForGrouping: payload.eventsPerGrouping?.[grouping.key] ?? [],
+      holidayDates,
     })
   )
+
+  // Add holiday days (empty for now, but structure supports future additions)
+  const allDays = [...days, ...holidayDays]
 
   const calendar = await CalendarModel.create({
     name: payload.name,
@@ -234,7 +265,7 @@ export async function createCalendar(
     includeWeekends,
     includeHolidays: payload.includeHolidays ?? false,
     groupings,
-    days,
+    days: allDays,
   })
 
   return toCalendarDTO(calendar)
@@ -274,16 +305,95 @@ export async function shiftCalendarDays(
           )
           .map((grouping: CalendarGroupingSubdocument) => grouping.key)
 
+  // Get holiday dates for exclusion
+  const holidayDates = getHolidayDates(calendar.days)
+
+  // Calculate new date for target day (raw delta shift)
+  const rawNewDate = addDays(targetDay.date, delta)
+
+  // Validate and adjust target date to next valid school date if needed
+  // This ensures the target day doesn't land on a weekend/holiday (unless weekends are included)
+  const newTargetDate = nextSchoolDate(
+    rawNewDate,
+    calendar.includeWeekends,
+    holidayDates
+  )
+
+  // Find the starting sequence for reflow
   const startingSequence = targetDay.groupingSequence
 
-  calendar.days.forEach((day: CalendarDaySubdocument) => {
-    if (
-      groupingKeys.includes(day.groupingKey) &&
-      day.groupingSequence >= startingSequence
-    ) {
-      day.date = addDays(day.date, delta)
+  // Get all days that need to be reflowed, sorted by sequence
+  const daysToReflow = calendar.days
+    .filter(
+      (day: CalendarDaySubdocument) =>
+        groupingKeys.includes(day.groupingKey) &&
+        day.groupingSequence >= startingSequence
+    )
+    .sort(
+      (a: CalendarDaySubdocument, b: CalendarDaySubdocument) =>
+        a.groupingSequence - b.groupingSequence
+    )
+
+  if (daysToReflow.length === 0) {
+    // No days to reflow, just update target day
+    targetDay.date = newTargetDate
+    calendar.markModified('days')
+    await calendar.save()
+    return toCalendarDTO(calendar)
+  }
+
+  // Ensure target day is first (sequence ties)
+  const targetIndex = daysToReflow.findIndex(
+    (day: CalendarDaySubdocument) => day._id === targetDay._id
+  )
+  if (targetIndex === -1) {
+    targetDay.date = newTargetDate
+    calendar.markModified('days')
+    await calendar.save()
+    return toCalendarDTO(calendar)
+  }
+  if (targetIndex > 0) {
+    const [targetInList] = daysToReflow.splice(targetIndex, 1)
+    if (targetInList) {
+      daysToReflow.unshift(targetInList)
     }
-  })
+  }
+
+  // Capture valid-day gaps between consecutive days
+  const gapSpans: number[] = []
+  for (let i = 0; i < daysToReflow.length - 1; i++) {
+    const current = new Date(daysToReflow[i]!.date)
+    const next = new Date(daysToReflow[i + 1]!.date)
+    const span = countValidDaySpan(
+      current,
+      next,
+      calendar.includeWeekends,
+      holidayDates
+    )
+    gapSpans.push(span > 0 ? span : 1)
+  }
+
+  // Set the target day's new date (it's the first in the reflow list)
+  const firstDay = daysToReflow[0]!
+  firstDay.date = newTargetDate
+
+  // Generate valid dates for remaining days starting from day after target
+  const remainingDays = daysToReflow.slice(1)
+
+  if (remainingDays.length > 0) {
+    let previousDate = newTargetDate
+    for (let i = 0; i < remainingDays.length; i++) {
+      const span = gapSpans[i] ?? 1
+      const nextDate = addValidSchoolDays(
+        previousDate,
+        span,
+        calendar.includeWeekends,
+        holidayDates
+      )
+      remainingDays[i]!.date = nextDate
+      previousDate = nextDate
+    }
+  }
 
   calendar.markModified('days')
   await calendar.save()
