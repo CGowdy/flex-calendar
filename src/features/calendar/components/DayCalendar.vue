@@ -39,27 +39,31 @@ const dayLabel = computed(() => {
     <div v-if="selectedItem" class="day__content">
       <div class="card">
         <div class="row">
-          <span class="muted">Label</span>
-          <strong>{{ selectedItem.label }}</strong>
+          <span class="muted">Title</span>
+          <strong>{{ selectedItem.title }}</strong>
         </div>
         <div class="row">
-          <span class="muted">Track</span>
+          <span class="muted">Layer</span>
           <strong>{{ selectedItem.layerKey }}</strong>
         </div>
         <div class="row">
           <span class="muted">Date</span>
           <strong>{{ new Date(selectedItem.date).toLocaleDateString() }}</strong>
         </div>
+        <div class="row">
+          <span class="muted">Duration</span>
+          <strong>{{ selectedItem.durationDays ?? 1 }} day{{ (selectedItem.durationDays ?? 1) === 1 ? '' : 's' }}</strong>
+        </div>
       </div>
 
       <div class="card">
-        <h4>Events</h4>
-        <ul class="events">
-          <li v-for="ev in selectedItem.events" :key="ev.id" class="event">
-            <strong>{{ ev.title }}</strong>
-            <p v-if="ev.description">{{ ev.description }}</p>
-          </li>
-        </ul>
+        <h4>Description</h4>
+        <p v-if="selectedItem.description">{{ selectedItem.description }}</p>
+        <p v-else class="muted">No description provided.</p>
+
+        <h4>Notes</h4>
+        <p v-if="selectedItem.notes">{{ selectedItem.notes }}</p>
+        <p v-else class="muted">No notes yet.</p>
       </div>
     </div>
 
@@ -96,19 +100,6 @@ const dayLabel = computed(() => {
 .muted {
   color: var(--color-text);
   opacity: 0.75;
-}
-.events {
-  list-style: none;
-  padding: 0;
-  margin: 0;
-  display: grid;
-  gap: 0.4rem;
-}
-.event {
-  border: 1px solid var(--color-border);
-  background: var(--color-background);
-  border-radius: 0.5rem;
-  padding: 0.5rem;
 }
 </style>
 

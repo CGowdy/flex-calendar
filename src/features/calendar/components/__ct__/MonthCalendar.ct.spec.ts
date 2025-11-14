@@ -27,18 +27,22 @@ function makeCalendar(): Calendar {
         date: '2025-11-10T00:00:00.000Z',
         layerKey: 'reference',
         sequenceIndex: 1,
-        label: 'Day 1',
+        title: 'Reference Lesson 1',
+        description: 'Intro lesson',
         notes: '',
-        events: [{ id: 'e1', title: 'Reference Lesson 1', description: '', durationDays: 1, metadata: {} }],
+        durationDays: 1,
+        metadata: {},
       },
       {
         id: 'd2',
         date: '2025-11-11T00:00:00.000Z',
         layerKey: 'reference',
         sequenceIndex: 2,
-        label: 'Day 2',
+        title: 'Reference Lesson 2',
+        description: '',
         notes: '',
-        events: [{ id: 'e2', title: 'Reference Lesson 2', description: '', durationDays: 1, metadata: {} }],
+        durationDays: 1,
+        metadata: {},
       },
     ],
   }
@@ -56,8 +60,8 @@ test.describe('MonthCalendar', () => {
       },
     })
 
-    await expect(component.getByText('Day 1')).toBeVisible()
     await expect(component.getByText('Reference Lesson 1')).toBeVisible()
+    await expect(component.getByText('Intro lesson')).toBeVisible()
   })
 
   test('emits select-day when clicking event', async ({ mount }) => {
@@ -73,7 +77,7 @@ test.describe('MonthCalendar', () => {
       },
     })
 
-    await component.getByText('Day 2').click()
+    await component.getByText('Reference Lesson 2').click()
     expect(emitted).toContain('d2')
   })
 })

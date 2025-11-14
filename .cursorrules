@@ -22,7 +22,6 @@ Agent workflow
 - After making config/dependency changes affecting the web dev server, immediately run “docker-compose up -d --build web”.
 - After typical code edits under src/**, do not rebuild; just refresh the browser. If the change is not detected within ~2 seconds, run “docker-compose restart web”.
 
-
 # AI Agent Repository Rules (Vue-First Edition)
 
 ## 0) Solo-Maintainability Defaults (you are the only dev)
@@ -109,16 +108,13 @@ Prefer fast, meaningful tests over brittle or overly mocked tests.
 - Use **Vue 3** with `<script setup>` and the **Composition API**.
 - Define props/emits with `defineProps` / `defineEmits` and strong types.
 - Organize features like:
-src/
-features/
-<feature>/
-components/
-composables/
-stores/
-services/
-
-markdown
-Copy code
+  - src/
+    - features/
+      - <feature>/
+        - components/
+        - composables/
+        - stores/
+        - services/
 - Keep templates presentational; move logic into script or composables.
 - Prefer slots and composition patterns over prop overloads.
 - Use **Pinia** (or equivalent) for global state.
@@ -182,37 +178,88 @@ Copy code
   - Rebuild a single service: `docker compose -f infra/docker-compose.full.yml up -d --build web` (or `api`).
 
 
-
 ## Cursor Project Direction
 
 You are helping me evolve a repo called "Flex Calendar".
 
 Context:
-- This app is currently designed around a homeschool use case (Abeka curriculum + student calendars + holidays).
+- This app was originally designed around a homeschool use case (Abeka curriculum + student calendars + holidays).
 - Under the hood, it already has:
-  - Calendar creation with generated "days" (e.g. Day 1..N).
-  - Groupings (Abeka, student A/B, holidays) with flags like autoShift / isChained.
-  - A scheduling engine that can reflow days when they’re moved, and skip weekends and holidays.
+  - Calendar creation with generated sequences of days/events.
+  - Layers (previously called “groupings”) per calendar with flags like `chainBehavior` and `kind` (`standard` vs `exception`).
+  - A scheduling engine that can reflow items when they’re moved, and skip weekends and exception dates.
   - Month / week / day calendar views with drag-and-drop and chain-aware moves.
-  - Markdown docs: implementation-status.md, product-spec.md, workflow.md, HowTo.md that describe the current behavior and roadmap.
+  - Markdown docs: `implementation-status.md`, `product-spec.md`, `workflow.md`, `HowTo.md` that describe current behavior and roadmap.
 
 Goal:
 - Generalize the app into a **generic flexible calendar**:
   - No hard-coded “Abeka”, “student A/B”, or homeschool-only naming in the core domain.
-  - Homeschool/Abeka becomes a **use-case / preset**, not the core mental model.
+  - Homeschool/Abeka becomes a **preset/use case**, not the core mental model.
   - The core concepts should be usable for any domain where people want chainable events in a calendar:
     - lesson plans, content pipelines, fitness programs, etc.
 
-High-level direction:
-- Keep the **existing behavior and architecture** (reflowing days, skipping weekends/holidays, chain moves).
-- Refactor names and docs so the domain is generic.
+Core domain vocabulary (use these terms consistently in code, tests, and docs):
 
-Use this vocabulary going forward:
+- **Calendar**  
+  - Top-level container, like a Google Calendar or an iCal calendar.  
+  - Examples: “2025–2026 School Year”, “Q1 Content Plan”, “12-Week Strength Program”.  
+  - Holds:
+    - `layers: CalendarLayer[]`
+    - `scheduledItems: CalendarEvent[]` (all events across all layers).
 
-- **Calendar**: Top-level container, like in Google Calendar or iCal.
-- **Layer** (was "grouping"): A logical track within a calendar (e.g. “Math plan”, “Actual progress for Kid A”, “Holidays”). Different layers can be displayed together on the calendar.
-- **Template item**: A step in an ordered sequence that is not yet tied to a specific date. This is the generic version of “Abeka Day N”.
-- **Scheduled item**: A concrete item on a specific date in a specific layer (what most calendar apps call an “event” or “entry”). This is what gets moved around by the user.
-- **Chain**: A group of scheduled items that should move together according to chain rules.
-- **Chain behavior**: Rules for how a chain reflows (shift following items, respect weekends/holidays, etc.).
-- **Exception**: A date that should be excluded or treated specially (holidays, sick days, blackout dates). Often implemented as a Holidays layer, but the engine should treat them generically as exceptions.
+- **CalendarLayer** (often shown simply as “Layer” in the UI)  
+  - A logical track inside a single Calendar.  
+  - Examples: “Mercy”, “Grace”, “Holidays”, “Plan”, “Actual”, “Workouts”.  
+  - Identified by `key`, referenced by `CalendarEvent.layerKey`.  
+  - Has:
+    - `chainBehavior: 'linked' | 'independent'`
+    - `kind: 'standard' | 'exception'` (exception layers are used for holidays/blackouts).
+
+- **CalendarEvent**  
+  - The atomic scheduled thing that appears on the calendar grid for a specific date in a specific layer.  
+  - This is what maps 1:1 to a Google Calendar event on export.  
+  - Fields include:
+    - `id`, `date` (ISO), `layerKey`
+    - `sequenceIndex` (position in a plan/chain)
+    - `title`, `description?`, `notes`
+    - `durationDays?`, `metadata?`  
+  - The old type name **ScheduledItem** is now an alias to `CalendarEvent`. Prefer `CalendarEvent` in new code.
+
+- **Chain behavior**  
+  - Controlled primarily by `CalendarLayer.chainBehavior`.  
+  - `linked` = events in this layer participate in chain behavior; moving one may reflow others.  
+  - `independent` = events do not auto-shift when one is moved.  
+  - Shift logic is handled via `ShiftScheduledItemsRequest` and operates on `CalendarEvent[]` within a single Calendar.
+
+- **Exception layer**  
+  - A `CalendarLayer` with `kind: 'exception'`.  
+  - Used to store holidays, sick days, blackout dates, etc.  
+  - When `Calendar.includeExceptions` is true, generation and shifting logic should treat events in exception layers as dates to be skipped for standard layers.
+
+- **Template generation (no persisted TemplateItem type)**  
+  - Templates only exist as **inputs** on `CreateCalendarRequest` via:
+    - `layers?: CreateCalendarLayerInput[]` (with `templateConfig`)
+    - `templateItemsByLayer?: Record<layerKey, { title, description?, durationDays? }[]>`  
+  - The server converts these into concrete `CalendarEvent[]` at creation time.  
+  - There is **no separate persisted TemplateItem type**; after creation, the only scheduled unit is `CalendarEvent`.
+
+What to avoid:
+- Do NOT:
+  - Collapse Calendar and CalendarLayer into one concept.
+  - Introduce a separate `TemplateItem` type in the persisted model.
+  - Treat `CalendarEvent` as a container of sub-events (there is no nested event type now).
+- Do NOT rename `Calendar.scheduledItems` yet without an explicit request; it currently stores `CalendarEvent[]` and is used heavily. Prefer treating it as “all events for this calendar”.
+
+What I want from you:
+- Keep the existing scheduling behavior (reflow, skipping weekends/exceptions, chain moves), but:
+  - Refactor names and docs to use the vocabulary above.
+  - Remove or move homeschool-specific wording to example/preset sections in docs.
+- Make the UI and code consistent with the model:
+  - Header dropdown = select **Calendar**.
+  - Left sidebar list = **Layers in the selected Calendar**.
+  - Things on the grid = **CalendarEvent**s.
+
+When modifying or generating code:
+- Use `Calendar`, `CalendarLayer`, and `CalendarEvent` consistently.
+- Treat `ScheduledItem` as a backwards-compat alias for `CalendarEvent` and prefer `CalendarEvent` in new code and docs.
+- Keep changes scoped; don’t rewrite unrelated features while refactoring names.

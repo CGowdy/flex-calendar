@@ -117,6 +117,27 @@ export const useCalendarStore = defineStore('calendar', () => {
     }, {})
   })
 
+  function slugify(value: string): string {
+    return value
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '')
+  }
+
+  function generateLayerKey(name: string): string {
+    const existing = new Set(
+      activeCalendar.value?.layers.map((layer) => layer.key) ?? []
+    )
+    const base = slugify(name) || 'layer'
+    let candidate = base
+    let suffix = 1
+    while (existing.has(candidate)) {
+      candidate = `${base}-${suffix}`
+      suffix += 1
+    }
+    return candidate
+  }
+
   async function loadCalendars(options: LoadOptions = {}): Promise<void> {
     if (calendarsLoaded.value && !options.force) {
       return
@@ -187,6 +208,43 @@ export const useCalendarStore = defineStore('calendar', () => {
     }
   }
 
+  async function createLayerForActiveCalendar(options: {
+    name: string
+    color?: string
+    chainBehavior?: 'linked' | 'independent'
+    kind?: 'standard' | 'exception'
+  }): Promise<Calendar | null> {
+    if (!activeCalendar.value || !activeCalendarId.value) {
+      throw new Error('Select a calendar before adding layers')
+    }
+
+    const trimmedName = options.name.trim()
+    if (!trimmedName) {
+      throw new Error('Layer name is required')
+    }
+
+    const key = generateLayerKey(trimmedName)
+    const patch = {
+      layers: [
+        {
+          key,
+          name: trimmedName,
+          color: options.color ?? '#64748b',
+          description: '',
+          chainBehavior: options.chainBehavior ?? 'linked',
+          kind: options.kind ?? 'standard',
+        },
+      ],
+    }
+
+    const updated = await updateCalendarMeta(activeCalendarId.value, patch)
+    activeCalendar.value = updated
+    calendars.value = calendars.value.map((summary) =>
+      summary.id === updated.id ? updated : summary
+    )
+    return updated
+  }
+
   function selectCalendar(calendarId: string | null) {
     activeCalendarId.value = calendarId
     if (calendarId === null) {
@@ -252,6 +310,7 @@ export const useCalendarStore = defineStore('calendar', () => {
     updateLayerColor,
     persistLayerColor,
     schedulePersistLayerColor,
+    createLayerForActiveCalendar,
   }
 })
 

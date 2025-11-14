@@ -5,7 +5,6 @@ import {
   type Calendar,
   type CalendarDocument,
   type CalendarLayer,
-  type CalendarEvent,
   type ScheduledItem,
 } from '../models/calendarModel.js'
 import type {
@@ -13,7 +12,6 @@ import type {
   CalendarLayerDTO,
   CalendarEventDTO,
   CalendarSummaryDTO,
-  ScheduledItemDTO,
 } from '../types/calendar.js'
 import type {
   CreateCalendarInput,
@@ -73,29 +71,18 @@ function toLayerDTO(layer: CalendarLayer): CalendarLayerDTO {
   }
 }
 
-function toEventDTO(event: CalendarEvent): CalendarEventDTO {
-  const enrichedEvent = event as CalendarEvent & { id?: string }
-  return {
-    id: enrichedEvent.id ?? enrichedEvent._id,
-    title: enrichedEvent.title,
-    description: enrichedEvent.description ?? '',
-    durationDays: enrichedEvent.durationDays ?? 1,
-    metadata: (enrichedEvent.metadata ?? {}) as Record<string, unknown>,
-  }
-}
-
-function toScheduledItemDTO(item: ScheduledItem): ScheduledItemDTO {
+function toCalendarEventDTO(item: ScheduledItem): CalendarEventDTO {
   const enrichedItem = item as ScheduledItem & { id?: string }
   return {
     id: enrichedItem.id ?? enrichedItem._id,
     date: new Date(enrichedItem.date),
     layerKey: enrichedItem.layerKey,
     sequenceIndex: enrichedItem.sequenceIndex ?? enrichedItem.groupingSequence,
-    label: enrichedItem.label,
+    title: enrichedItem.title,
+    description: enrichedItem.description ?? '',
     notes: enrichedItem.notes ?? '',
-    events: Array.isArray(enrichedItem.events)
-      ? enrichedItem.events.map((event) => toEventDTO(event))
-      : [],
+    durationDays: enrichedItem.durationDays ?? 1,
+    metadata: (enrichedItem.metadata ?? {}) as Record<string, unknown>,
   }
 }
 
@@ -106,7 +93,7 @@ function toCalendarDTO(calendar: CalendarDocument): CalendarDTO {
     id: json.id,
     name: json.name,
     presetKey: json.presetKey || json.source,
-    startDate: new Date(json.startDate),
+    startDate: json.startDate ? new Date(json.startDate) : null,
     includeWeekends: json.includeWeekends,
     includeExceptions:
       typeof json.includeExceptions === 'boolean'
@@ -116,7 +103,7 @@ function toCalendarDTO(calendar: CalendarDocument): CalendarDTO {
       toLayerDTO(layer as CalendarLayer)
     ),
     scheduledItems: (json.scheduledItems ?? json.days ?? []).map((item) =>
-      toScheduledItemDTO(item as ScheduledItem)
+      toCalendarEventDTO(item as ScheduledItem)
     ),
   }
 }
@@ -154,8 +141,22 @@ type NormalizedLayer = {
 }
 
 function normalizeLayers(layers: CreateCalendarInput['layers']): NormalizedLayer[] {
-  if (!layers || layers.length === 0) {
-    return DEFAULT_LAYERS
+  if (!layers) {
+    return DEFAULT_LAYERS.map((layer) => ({
+      layer: {
+        key: layer.key,
+        name: layer.name,
+        color: layer.color ?? '',
+        description: layer.description ?? '',
+        autoShift: layer.autoShift ?? true,
+        kind: layer.kind ?? 'standard',
+      } as CalendarLayer,
+      templateConfig: layer.templateConfig,
+    }))
+  }
+
+  if (layers.length === 0) {
+    return []
   }
 
   return layers.map((layer) => {
@@ -234,24 +235,17 @@ function generateScheduledItemsForLayer({
       (titlePattern && titlePattern.includes('{n}')
         ? titlePattern.replace('{n}', String(sequenceIndex))
         : `${layerName} Item ${sequenceIndex}`)
-    const events: CalendarEvent[] = [
-      {
-        _id: nanoid(),
-        title: computedTitle,
-        description: templateEvent?.description ?? '',
-        durationDays: templateEvent?.durationDays ?? 1,
-        metadata: {},
-      },
-    ]
 
     scheduledItems.push({
       _id: nanoid(),
       date: schoolDate,
       layerKey,
       sequenceIndex,
-      label: `Item ${sequenceIndex}`,
+      title: computedTitle,
+      description: templateEvent?.description ?? '',
       notes: '',
-      events,
+      durationDays: templateEvent?.durationDays ?? 1,
+      metadata: {},
     })
   }
 
@@ -287,7 +281,7 @@ export async function createCalendar(
   payload: CreateCalendarInput
 ): Promise<CalendarDTO> {
   const includeWeekends = payload.includeWeekends ?? false
-  const startDate = new Date(payload.startDate)
+  const startDate = payload.startDate ? new Date(payload.startDate) : null
   const normalizedLayers = normalizeLayers(payload.layers)
 
   const templateItemsByLayer = new Map(
@@ -301,29 +295,32 @@ export async function createCalendar(
   // For now, exception layers are created empty; scheduler will respect them once populated.
   const holidayDates = new Set<string>()
 
-  const scheduledItems = normalizedLayers.flatMap(({ layer, templateConfig }) => {
-    if (
-      layer.kind === 'exception' ||
-      exceptionLayerKeys.includes(layer.key) ||
-      templateConfig?.mode === 'manual'
-    ) {
-      return []
-    }
+  const scheduledItems =
+    startDate === null
+      ? []
+      : normalizedLayers.flatMap(({ layer, templateConfig }) => {
+          if (
+            layer.kind === 'exception' ||
+            exceptionLayerKeys.includes(layer.key) ||
+            templateConfig?.mode === 'manual'
+          ) {
+            return []
+          }
 
-    const itemCount =
-      templateConfig?.itemCount ?? DEFAULT_TEMPLATE_ITEM_COUNT
+          const itemCount =
+            templateConfig?.itemCount ?? DEFAULT_TEMPLATE_ITEM_COUNT
 
-    return generateScheduledItemsForLayer({
-      layerKey: layer.key,
-      layerName: layer.name,
-      includeWeekends,
-      startDate,
-      itemCount,
-      titlePattern: templateConfig?.titlePattern,
-      templateItems: templateItemsByLayer.get(layer.key) ?? [],
-      holidayDates,
-    })
-  })
+          return generateScheduledItemsForLayer({
+            layerKey: layer.key,
+            layerName: layer.name,
+            includeWeekends,
+            startDate,
+            itemCount,
+            titlePattern: templateConfig?.titlePattern,
+            templateItems: templateItemsByLayer.get(layer.key) ?? [],
+            holidayDates,
+          })
+        })
 
   const calendar = await CalendarModel.create({
     name: payload.name,
@@ -485,7 +482,28 @@ export async function updateCalendar(
     const byKey = new Map(calendar.layers.map((layer) => [layer.key, layer]))
     for (const patch of payload.layers) {
       const target = byKey.get(patch.key)
-      if (!target) continue
+      if (!target) {
+        if (!patch.name) {
+          throw new Error(`Layer ${patch.key} requires a name when creating`)
+        }
+        const kind = patch.kind ?? 'standard'
+        const newLayer: CalendarLayerSubdocument = {
+          key: patch.key,
+          name: patch.name,
+          color: patch.color ?? '',
+          description: patch.description ?? '',
+          autoShift: resolveChainBehavior(
+            patch.chainBehavior,
+            patch.autoShift,
+            kind
+          ),
+          kind,
+        }
+        calendar.layers.push(newLayer)
+        byKey.set(newLayer.key, newLayer)
+        modified = true
+        continue
+      }
       if (typeof patch.name === 'string') target.name = patch.name
       if (typeof patch.color === 'string') target.color = patch.color
       if (typeof patch.description === 'string') target.description = patch.description

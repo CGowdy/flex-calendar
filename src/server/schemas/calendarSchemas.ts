@@ -26,7 +26,7 @@ export const layerSchema = z.object({
 export const createCalendarSchema = z.object({
   name: z.string().min(1),
   presetKey: z.string().optional(),
-  startDate: z.string().datetime(),
+  startDate: z.string().datetime().optional(),
   includeWeekends: z.boolean().optional().default(false),
   includeExceptions: z.boolean().optional().default(false),
   layers: z.array(layerSchema).optional(),

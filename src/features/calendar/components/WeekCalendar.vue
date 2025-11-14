@@ -94,8 +94,8 @@ const headerLabel = computed(() => {
                 <span class="dot"
                   :style="{ backgroundColor: (calendar.layers.find(layer => layer.key === item.layerKey)?.color) || '#2563eb' }"
                 />
-                <span class="event__label">{{ item.label }}</span>
-                <span v-if="item.events[0]?.title" class="event__title">{{ item.events[0]?.title }}</span>
+                <span class="event__label">{{ item.title }}</span>
+                <span v-if="item.description" class="event__title">{{ item.description }}</span>
               </button>
             </li>
           </ul>

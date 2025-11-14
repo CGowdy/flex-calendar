@@ -91,12 +91,12 @@ function handleShift(item: ScheduledItem, delta: number) {
               @click="emit('select-day', item.id)"
             >
               <div class="day-title">
-                <span class="day-label">{{ item.label }}</span>
+                <span class="day-label">{{ item.title }}</span>
                 <span class="day-date">{{ formatDate(item.date) }}</span>
               </div>
 
-              <p v-if="item.events.length > 0" class="day-event">
-                {{ item.events[0]?.title }}
+              <p v-if="item.description" class="day-event">
+                {{ item.description }}
               </p>
             </button>
 

@@ -8,6 +8,7 @@ let disconnectFromDatabase: () => Promise<void>
 let createCalendar: typeof import('../services/calendarService.js').createCalendar
 let shiftScheduledItems: typeof import('../services/calendarService.js').shiftScheduledItems
 let getCalendarById: typeof import('../services/calendarService.js').getCalendarById
+let updateCalendar: typeof import('../services/calendarService.js').updateCalendar
 let CalendarModel: typeof import('../models/calendarModel.js').CalendarModel
 import type { CalendarDTO } from '../types/calendar.js'
 
@@ -24,6 +25,7 @@ beforeAll(async () => {
     createCalendar,
     shiftScheduledItems,
     getCalendarById,
+    updateCalendar,
   } = await import('../services/calendarService.js'))
 
   await connectToDatabase()
@@ -160,6 +162,47 @@ describe('calendarService.shiftScheduledItems', () => {
     expect(new Date(updatedProgress!.date).toISOString()).toBe(
       new Date(progressBefore!.date).toISOString()
     )
+  })
+})
+
+describe('calendarService.createCalendar', () => {
+  it('creates an empty calendar without a start date', async () => {
+    const calendar = await createCalendar({
+      name: 'Idea Backlog',
+      layers: [],
+    })
+
+    expect(calendar.id).toBeTruthy()
+    expect(calendar.startDate).toBeNull()
+    expect(calendar.layers).toHaveLength(0)
+    expect(calendar.scheduledItems).toHaveLength(0)
+  })
+})
+
+describe('calendarService.updateCalendar', () => {
+  it('adds a new layer when key is unknown', async () => {
+    const calendar = await createCalendar({
+      name: 'Layer Add Test',
+      startDate: new Date('2025-08-04').toISOString(),
+      includeWeekends: false,
+      includeExceptions: false,
+    })
+
+    const updated = await updateCalendar(calendar.id, {
+      layers: [
+        {
+          key: 'custom-track',
+          name: 'Custom Track',
+          color: '#22c55e',
+          chainBehavior: 'independent',
+        },
+      ],
+    })
+
+    expect(updated).not.toBeNull()
+    const customLayer = updated!.layers.find((layer) => layer.key === 'custom-track')
+    expect(customLayer).toBeTruthy()
+    expect(customLayer?.name).toBe('Custom Track')
   })
 })
 

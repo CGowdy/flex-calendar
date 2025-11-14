@@ -2,56 +2,16 @@ import mongoose, { Schema } from 'mongoose'
 import type { HydratedDocument, Model } from 'mongoose'
 import { nanoid } from '../utils/id.js'
 
-export interface CalendarEvent {
-  _id: string
-  // Optional client-facing id used after toJSON normalization
-  id?: string
-  title: string
-  description: string
-  durationDays: number
-  metadata: Record<string, unknown>
-}
-
-const CalendarEventSchema = new Schema<CalendarEvent>(
-  {
-    _id: {
-      type: String,
-      default: () => nanoid(),
-    },
-    title: {
-      type: String,
-      required: true,
-      trim: true,
-    },
-    description: {
-      type: String,
-      default: '',
-      trim: true,
-    },
-    durationDays: {
-      type: Number,
-      default: 1,
-      min: 1,
-    },
-    metadata: {
-      type: Schema.Types.Mixed as Schema['obj']['metadata'],
-      default: () => ({}),
-    } as unknown as CalendarEvent['metadata'],
-  },
-  {
-    _id: false,
-    timestamps: false,
-  }
-)
-
 export interface ScheduledItem {
   _id: string
   date: Date
   layerKey: string
   sequenceIndex: number
-  label: string
+  title: string
+  description: string
   notes: string
-  events: CalendarEvent[]
+  durationDays: number
+  metadata: Record<string, unknown>
 }
 
 const ScheduledItemSchema = new Schema<ScheduledItem>(
@@ -75,9 +35,14 @@ const ScheduledItemSchema = new Schema<ScheduledItem>(
       min: 1,
       alias: 'groupingSequence',
     },
-    label: {
+    title: {
       type: String,
       required: true,
+      trim: true,
+    },
+    description: {
+      type: String,
+      default: '',
       trim: true,
     },
     notes: {
@@ -85,10 +50,15 @@ const ScheduledItemSchema = new Schema<ScheduledItem>(
       default: '',
       trim: true,
     },
-    events: {
-      type: [CalendarEventSchema],
-      default: () => [],
+    durationDays: {
+      type: Number,
+      default: 1,
+      min: 1,
     },
+    metadata: {
+      type: Schema.Types.Mixed as Schema['obj']['metadata'],
+      default: () => ({}),
+    } as unknown as ScheduledItem['metadata'],
   },
   {
     _id: false,
@@ -147,7 +117,7 @@ export interface Calendar {
   name: string
   presetKey?: string
   source?: 'abeka' | 'custom' // legacy alias
-  startDate: Date
+  startDate?: Date | null
   totalDays: number
   includeWeekends: boolean
   includeHolidays?: boolean // legacy alias
@@ -170,7 +140,8 @@ const CalendarSchema = new Schema<Calendar>(
     },
     startDate: {
       type: Date,
-      required: true,
+      required: false,
+      default: null,
     },
     totalDays: {
       type: Number,
@@ -205,12 +176,6 @@ const CalendarSchema = new Schema<Calendar>(
 
 CalendarSchema.index({ name: 1 }, { unique: false })
 
-type ScheduledItemWithInternalIds = ScheduledItem & {
-  _id?: string
-  id?: string
-  events?: Array<CalendarEvent & { _id?: string; id?: string }>
-}
-
 CalendarSchema.set('toJSON', {
   virtuals: true,
   versionKey: false,
@@ -227,25 +192,13 @@ CalendarSchema.set('toJSON', {
     }
 
     if (Array.isArray(calendarRet.scheduledItems)) {
-      calendarRet.scheduledItems = calendarRet.scheduledItems.map((item) => {
-        const normalizedEvents = Array.isArray(item.events)
-          ? item.events.map((event) => ({
-              ...((event as unknown) as Record<string, unknown>),
-              id: (event as CalendarEvent).id ?? (event as CalendarEvent)._id ?? nanoid(),
-              _id: undefined,
-            }))
-          : []
-
-        return {
-          ...((item as unknown) as Record<string, unknown>),
-          id:
-            (item as ScheduledItemWithInternalIds).id ??
-            (item as ScheduledItemWithInternalIds)._id ??
-            nanoid(),
-          _id: undefined,
-          events: normalizedEvents as unknown as CalendarEvent[],
-        } as unknown as ScheduledItemWithInternalIds
-      })
+      calendarRet.scheduledItems = calendarRet.scheduledItems.map((item) => ({
+        ...((item as unknown) as Record<string, unknown>),
+        id: (item as { id?: string; _id?: string }).id ??
+          (item as { _id?: string })._id ??
+          nanoid(),
+        _id: undefined,
+      }))
     }
 
     if (!calendarRet.scheduledItems && Array.isArray(calendarRet.days)) {

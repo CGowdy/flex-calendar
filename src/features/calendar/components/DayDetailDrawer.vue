@@ -82,7 +82,7 @@ function handleSubmit() {
       <template v-if="day">
         <header class="drawer__header">
           <div>
-            <h2>{{ day!.label }}</h2>
+            <h2>{{ day!.title }}</h2>
             <p class="drawer__meta">
               {{ formatDate(day!.date) }} · Layer:
               {{ calendar?.layers.find((layer) => layer.key === day!.layerKey)?.name ?? day!.layerKey }}
@@ -101,20 +101,16 @@ function handleSubmit() {
 
         <section class="drawer__body">
           <article class="lesson-card">
-            <h3>Lesson details</h3>
-            <ul>
-              <li
-                v-for="event in day!.events"
-                :key="event.id"
-              >
-                <strong>{{ event.title }}</strong>
-                <p v-if="event.description">{{ event.description }}</p>
-                <span class="duration">
-                  Duration: {{ event.durationDays }} day{{ event.durationDays === 1 ? '' : 's' }}
-                </span>
-              </li>
-            </ul>
-            <p v-if="day!.events.length === 0">No events recorded for this day.</p>
+            <h3>Event details</h3>
+            <strong>{{ day!.title }}</strong>
+            <p v-if="day!.description">{{ day!.description }}</p>
+            <p v-else class="drawer__meta">No description provided.</p>
+            <p class="drawer__meta" v-if="day!.notes">
+              Notes: {{ day!.notes }}
+            </p>
+            <span class="duration">
+              Duration: {{ day!.durationDays ?? 1 }} day{{ (day!.durationDays ?? 1) === 1 ? '' : 's' }}
+            </span>
           </article>
 
           <article class="shift-card">

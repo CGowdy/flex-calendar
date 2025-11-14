@@ -3,20 +3,14 @@ export type LayerKind = 'standard' | 'exception'
 
 export interface CalendarEventDTO {
   id: string
-  title: string
-  description: string
-  durationDays: number
-  metadata: Record<string, unknown>
-}
-
-export interface ScheduledItemDTO {
-  id: string
   date: Date
   layerKey: string
   sequenceIndex: number
-  label: string
+  title: string
+  description: string
   notes: string
-  events: CalendarEventDTO[]
+  durationDays: number
+  metadata: Record<string, unknown>
 }
 
 export interface CalendarLayerDTO {
@@ -32,11 +26,11 @@ export interface CalendarDTO {
   id: string
   name: string
   presetKey?: string
-  startDate: Date
+  startDate: Date | null
   includeWeekends: boolean
   includeExceptions: boolean
   layers: CalendarLayerDTO[]
-  scheduledItems: ScheduledItemDTO[]
+  scheduledItems: CalendarEventDTO[]
 }
 
 export type CalendarSummaryDTO = Pick<

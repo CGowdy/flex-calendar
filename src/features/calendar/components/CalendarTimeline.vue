@@ -1,35 +1,33 @@
 <script setup lang="ts">
-import { computed, nextTick, ref, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import MiniCalendar from './MiniCalendar.vue'
-import CalendarQuickAddForm from './CalendarQuickAddForm.vue'
+import LayerQuickAddForm from './LayerQuickAddForm.vue'
 import Popover from 'primevue/popover'
 import { useCalendarStore } from '@stores/useCalendarStore'
 
 import type {
   Calendar,
   ScheduledItem,
-  CreateCalendarRequest,
 } from '@/features/calendar/types/calendar'
 
 const props = defineProps<{
   calendar: Calendar
   selectedDayId: string | null
   viewDate: Date
-  quickAddOpen?: boolean
-  quickAddSubmitting?: boolean
 }>()
 const emit = defineEmits<{
   (e: 'update:viewDate', d: Date): void
   (e: 'jump', d: Date): void
   (e: 'select-day', dayId: string): void
-  (e: 'toggle-quick-add'): void
-  (e: 'submit-quick-add', payload: CreateCalendarRequest): void
-  (e: 'cancel-quick-add'): void
 }>()
 
 const store = useCalendarStore()
 const quickAddPopover = ref<InstanceType<typeof Popover> | null>(null)
 const quickAddButtonRef = ref<HTMLElement | null>(null)
+const quickAddOpen = ref(false)
+const isCreatingLayer = ref(false)
+const layerError = ref<string | null>(null)
+const formInstanceKey = ref(0)
 
 // Keep a local month for the mini calendar so arrow navigation doesn't move the big calendar.
 const miniDate = ref(new Date(props.viewDate))
@@ -40,56 +38,45 @@ watch(
   }
 )
 
-watch(
-  () => props.quickAddOpen ?? false,
-  async (open) => {
-    if (open) {
-      await nextTick()
-      if (quickAddButtonRef.value) {
-        quickAddPopover.value?.show(quickAddButtonRef.value)
-      }
-    } else {
-      quickAddPopover.value?.hide()
-    }
-  }
-)
-
-function handleQuickAddToggle() {
-  if (props.quickAddSubmitting) {
+function handleQuickAddToggle(event: Event) {
+  if (isCreatingLayer.value) {
     return
   }
-  emit('toggle-quick-add')
+  if (quickAddOpen.value) {
+    quickAddPopover.value?.hide()
+    return
+  }
+  quickAddOpen.value = true
+  if (quickAddButtonRef.value) {
+    quickAddPopover.value?.show(event, quickAddButtonRef.value)
+  }
 }
 
 function handlePopoverHide() {
-  if (props.quickAddOpen) {
-    emit('cancel-quick-add')
-  }
+  quickAddOpen.value = false
+  layerError.value = null
+  formInstanceKey.value += 1
 }
 
-const startDate = computed(() => new Date(props.calendar.startDate))
-const projectedEndDate = computed(() => {
-  const lastItem =
-    props.calendar.scheduledItems[props.calendar.scheduledItems.length - 1]
-  return lastItem ? new Date(lastItem.date) : null
-})
-
-const totalScheduledItems = computed(
-  () => props.calendar.scheduledItems.length
-)
-
-const completionPercent = computed(() => {
-  if (!props.selectedDayId) {
-    return 0
+async function handleLayerSubmit(payload: { name: string; color: string }) {
+  if (isCreatingLayer.value) return
+  layerError.value = null
+  isCreatingLayer.value = true
+  try {
+    await store.createLayerForActiveCalendar({
+      name: payload.name,
+      color: payload.color,
+    })
+    quickAddPopover.value?.hide()
+    quickAddOpen.value = false
+    formInstanceKey.value += 1
+  } catch (error) {
+    layerError.value =
+      error instanceof Error ? error.message : 'Failed to create layer'
+  } finally {
+    isCreatingLayer.value = false
   }
-  const index = props.calendar.scheduledItems.findIndex(
-    (item) => item.id === props.selectedDayId
-  )
-  if (index < 0) {
-    return 0
-  }
-  return Math.round(((index + 1) / props.calendar.scheduledItems.length) * 100)
-})
+}
 
 const upcomingItems = computed<ScheduledItem[]>(() => {
   const today = new Date()
@@ -124,33 +111,6 @@ function formatDate(date: Date | null): string {
       </p>
     </header>
 
-    <section class="timeline__stats">
-      <article class="stat-card">
-        <span class="stat-label">Start date</span>
-        <strong>{{ formatDate(startDate) }}</strong>
-      </article>
-
-      <article class="stat-card">
-        <span class="stat-label">Projected end</span>
-        <strong>{{ formatDate(projectedEndDate) }}</strong>
-      </article>
-
-      <article class="stat-card">
-        <span class="stat-label">Scheduled items</span>
-        <strong>{{ totalScheduledItems }}</strong>
-      </article>
-    </section>
-
-    <section class="timeline__progress">
-      <span>Progress</span>
-      <div class="progress-bar" role="progressbar" :aria-valuenow="completionPercent" aria-valuemin="0" aria-valuemax="100">
-        <div class="progress-bar__value" :style="{ width: `${completionPercent}%` }" />
-      </div>
-      <span class="progress-label">
-        {{ completionPercent }}% complete
-      </span>
-    </section>
-
     <section class="timeline__tools">
       <MiniCalendar
         :model-value="miniDate"
@@ -161,34 +121,36 @@ function formatDate(date: Date | null): string {
 
     <section class="timeline__calendars">
       <div class="cal-header">
-        <h3>Calendars</h3>
+        <h3>Layers</h3>
         <div class="cal-header__actions">
           <button
             type="button"
             class="cal-add-button"
-            :aria-pressed="props.quickAddOpen ?? false"
-            :disabled="props.quickAddSubmitting"
+            :aria-pressed="quickAddOpen"
+            :disabled="isCreatingLayer"
             ref="quickAddButtonRef"
             @click="handleQuickAddToggle"
           >
             <span aria-hidden="true">+</span>
             <span class="sr-only">
-              {{ (props.quickAddOpen ?? false) ? 'Hide quick add form' : 'Show quick add form' }}
+              {{ quickAddOpen ? 'Hide layer form' : 'Show layer form' }}
             </span>
           </button>
 
           <Popover
             ref="quickAddPopover"
-            :dismissable="!(props.quickAddSubmitting ?? false)"
+            :dismissable="!isCreatingLayer"
             :show-close-icon="false"
             :focus-on-show="false"
             @hide="handlePopoverHide"
           >
-            <div class="quick-add-popover" role="dialog" aria-label="Quick add calendar">
-              <CalendarQuickAddForm
-                :submitting="props.quickAddSubmitting"
-                @submit="(payload) => emit('submit-quick-add', payload)"
-                @cancel="emit('cancel-quick-add')"
+            <div class="quick-add-popover" role="dialog" aria-label="Quick add layer">
+              <LayerQuickAddForm
+                :key="formInstanceKey"
+                :submitting="isCreatingLayer"
+                :error-message="layerError"
+                @submit="handleLayerSubmit"
+                @cancel="handlePopoverHide"
               />
             </div>
           </Popover>
@@ -230,7 +192,7 @@ function formatDate(date: Date | null): string {
             :class="{ active: selectedDayId === item.id }"
             @click="emit('select-day', item.id)"
           >
-            <span class="day-label">{{ item.label }}</span>
+            <span class="day-label">{{ item.title }}</span>
             <span class="day-date">{{ formatDate(new Date(item.date)) }}</span>
             <span class="chip">{{ item.layerKey }}</span>
           </button>
@@ -263,57 +225,6 @@ function formatDate(date: Date | null): string {
   font-size: 0.9rem;
   color: var(--color-text);
   opacity: 0.75;
-}
-
-.timeline__stats {
-  display: grid;
-  gap: 0.75rem;
-}
-
-.stat-card {
-  display: flex;
-  flex-direction: column;
-  gap: 0.25rem;
-  padding: 0.75rem;
-  border-radius: 0.75rem;
-  background: rgba(37, 99, 235, 0.12);
-}
-
-.stat-label {
-  font-size: 0.75rem;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: var(--color-text);
-  opacity: 0.75;
-}
-
-.stat-card strong {
-  font-size: 1rem;
-}
-
-.timeline__progress {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-}
-
-.progress-bar {
-  height: 0.65rem;
-  border-radius: 999px;
-  background: rgba(37, 99, 235, 0.1);
-  overflow: hidden;
-}
-
-.progress-bar__value {
-  height: 100%;
-  background: linear-gradient(135deg, #2563eb, #1d4ed8);
-  transition: width 0.3s ease;
-}
-
-.progress-label {
-  font-size: 0.85rem;
-  color: var(--color-text);
-  opacity: 0.85;
 }
 
 .timeline__upcoming ul {
