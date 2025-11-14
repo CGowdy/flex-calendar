@@ -12,69 +12,82 @@ const emit = defineEmits<{
   (event: 'cancel'): void
 }>()
 
-interface GroupingOption {
+interface LayerOption {
   key: string
   name: string
   color: string
-  autoShift: boolean
+  chainBehavior: 'linked' | 'independent'
+  kind: 'standard' | 'exception'
   selected: boolean
   description: string
+  templateMode: 'generated' | 'manual'
+  templateItemCount: number
   titlePattern: string
 }
 
-const groupingOptions = reactive<GroupingOption[]>([
+const layerOptions = reactive<LayerOption[]>([
   {
-    key: 'abeka',
-    name: 'Abeka',
+    key: 'reference',
+    name: 'Reference Layer',
     color: '#2563eb',
-    autoShift: true,
+    chainBehavior: 'linked',
+    kind: 'standard',
     selected: true,
-    description: 'Primary schedule from Abeka lesson plans.',
-    titlePattern: 'Lesson {n}',
+    description: 'Baseline plan used to define the primary sequence.',
+    templateMode: 'generated',
+    templateItemCount: 180,
+    titlePattern: 'Item {n}',
   },
   {
-    key: 'student-a',
-    name: 'Student A',
+    key: 'progress-a',
+    name: 'Progress Layer',
     color: '#059669',
-    autoShift: true,
+    chainBehavior: 'linked',
+    kind: 'standard',
     selected: true,
-    description: 'First student-specific pacing alignment.',
-    titlePattern: '',
+    description: 'Layer to track actual progress or a specific participant.',
+    templateMode: 'generated',
+    templateItemCount: 180,
+    titlePattern: 'Progress {n}',
   },
   {
-    key: 'student-b',
-    name: 'Student B',
+    key: 'progress-b',
+    name: 'Additional Layer',
     color: '#7c3aed',
-    autoShift: true,
+    chainBehavior: 'linked',
+    kind: 'standard',
     selected: false,
-    description: 'Optional second student schedule.',
+    description: 'Optional additional progress or scenario layer.',
+    templateMode: 'generated',
+    templateItemCount: 180,
     titlePattern: '',
   },
   {
-    key: 'holidays',
-    name: 'Holidays / Breaks',
+    key: 'exceptions',
+    name: 'Exceptions',
     color: '#f97316',
-    autoShift: false,
+    chainBehavior: 'independent',
+    kind: 'exception',
     selected: true,
-    description: 'Non instructional days that should not shift.',
+    description: 'Blackout days, pauses, or time off that should not shift.',
+    templateMode: 'manual',
+    templateItemCount: 0,
     titlePattern: '',
   },
 ])
 
 const form = reactive({
-  name: 'My Abeka School Year',
+  name: 'My Flexible Plan',
   startDate: new Date().toISOString().slice(0, 10),
-  totalDays: 170,
   includeWeekends: false,
-  includeHolidays: false,
+  includeExceptions: false,
 })
 
 const isValid = computed(
   () =>
     form.name.trim().length > 0 &&
     form.startDate.length > 0 &&
-    form.totalDays > 0 &&
-    groupingOptions.some((grouping) => grouping.selected)
+    layerOptions.some((layer) => layer.selected)
 )
 
 function handleSubmit() {
@@ -82,34 +95,39 @@ function handleSubmit() {
     return
   }
 
-  const groupings = groupingOptions
-    .filter((grouping) => grouping.selected)
-    .map((grouping) => ({
-      key: grouping.key,
-      name: grouping.name,
-      color: grouping.color,
-      autoShift: grouping.autoShift,
-      description: grouping.description,
-      titlePattern: grouping.titlePattern?.trim()
-        ? grouping.titlePattern.trim()
-        : undefined,
+  const layers = layerOptions
+    .filter((layer) => layer.selected)
+    .map((layer) => ({
+      key: layer.key,
+      name: layer.name,
+      color: layer.color,
+      chainBehavior: layer.chainBehavior,
+      kind: layer.kind,
+      description: layer.description,
+      templateConfig:
+        layer.templateMode === 'generated'
+          ? {
+              mode: 'generated',
+              itemCount: layer.templateItemCount,
+              titlePattern: layer.titlePattern?.trim() || undefined,
+            }
+          : { mode: 'manual' as const },
     }))
 
   emit('submit', {
     name: form.name.trim(),
     startDate: new Date(form.startDate).toISOString(),
-    totalDays: form.totalDays,
     includeWeekends: form.includeWeekends,
-    includeHolidays: form.includeHolidays,
-    groupings,
+    includeExceptions: form.includeExceptions,
+    layers,
   })
 }
 
-function toggleGroupAutoShift(option: GroupingOption) {
-  option.autoShift = !option.autoShift
+function toggleLayerChainBehavior(option: LayerOption) {
+  option.chainBehavior = option.chainBehavior === 'linked' ? 'independent' : 'linked'
 }
 
-function toggleGrouping(option: GroupingOption) {
+function toggleLayerSelection(option: LayerOption) {
   option.selected = !option.selected
 }
 </script>
@@ -119,10 +137,9 @@ function toggleGrouping(option: GroupingOption) {
     <div class="wizard-card">
       <header class="wizard-card__header">
         <div>
-          <h2>Create Academic Calendar</h2>
+          <h2>Create Flexible Calendar</h2>
           <p>
-            Import Abeka pacing and customize how your family’s schedule lines up
-            with holidays, weekends, and student-specific goals.
+            Define your start date, scheduling rules, and which layers you want to generate up front.
           </p>
         </div>
 
@@ -159,16 +176,6 @@ function toggleGrouping(option: GroupingOption) {
               />
             </label>
 
-            <label class="field">
-              <span>Total instructional days</span>
-              <input
-                v-model.number="form.totalDays"
-                type="number"
-                min="1"
-                placeholder="170"
-                required
-              />
-            </label>
           </div>
 
           <div class="toggles">
@@ -182,65 +189,91 @@ function toggleGrouping(option: GroupingOption) {
 
             <label class="toggle">
               <input
-                v-model="form.includeHolidays"
+                v-model="form.includeExceptions"
                 type="checkbox"
               />
-              <span>Allow holidays to shift with the schedule</span>
+              <span>Allow exception layers to shift with the schedule</span>
             </label>
           </div>
         </section>
 
         <section class="wizard-form__section">
-          <h3>Grouping tracks</h3>
+          <h3>Layers</h3>
           <p class="section-hint">
-            Choose the tracks that should stay in sync when lessons move. Disable
-            automatic shifting for tracks like holidays or special events.
+            Choose the layers you want to generate now. Reference and progress layers default to linked chains, while exception layers stay independent.
           </p>
 
           <ul class="grouping-list">
             <li
-              v-for="grouping in groupingOptions"
-              :key="grouping.key"
+              v-for="layer in layerOptions"
+              :key="layer.key"
               class="grouping-card"
             >
               <div class="grouping-card__header">
                 <label class="toggle">
                   <input
                     type="checkbox"
-                    :checked="grouping.selected"
+                    :checked="layer.selected"
                     :disabled="submitting"
-                    @change="toggleGrouping(grouping)"
+                    @change="toggleLayerSelection(layer)"
                   />
-                  <span>{{ grouping.name }}</span>
+                  <span>{{ layer.name }}</span>
                 </label>
                 <span
                   class="color-badge"
-                  :style="{ backgroundColor: grouping.color }"
+                  :style="{ backgroundColor: layer.color }"
                   aria-hidden="true"
                 />
               </div>
 
               <p class="grouping-description">
-                {{ grouping.description }}
+                {{ layer.description }}
               </p>
 
               <label class="toggle inline">
                 <input
                   type="checkbox"
-                  :checked="grouping.autoShift"
-                  :disabled="!grouping.selected || submitting"
-                  @change="toggleGroupAutoShift(grouping)"
+                  :checked="layer.chainBehavior === 'linked'"
+                  :disabled="!layer.selected || submitting"
+                  @change="toggleLayerChainBehavior(layer)"
                 />
-                <span>Shift automatically when lessons move</span>
+                <span>Linked chain (move together)</span>
               </label>
 
               <label class="field">
-                <span>Event title pattern (use {n} for day number)</span>
+                <span>Template mode</span>
+                <select
+                  v-model="layer.templateMode"
+                  :disabled="!layer.selected || layer.kind === 'exception' || submitting"
+                >
+                  <option value="generated">Generate sequence</option>
+                  <option value="manual">Manual items</option>
+                </select>
+              </label>
+
+              <label
+                v-if="layer.templateMode === 'generated'"
+                class="field"
+              >
+                <span>Items to generate</span>
                 <input
-                  v-model="grouping.titlePattern"
+                  v-model.number="layer.templateItemCount"
+                  type="number"
+                  min="1"
+                  :disabled="!layer.selected || submitting"
+                />
+              </label>
+
+              <label
+                v-if="layer.templateMode === 'generated'"
+                class="field"
+              >
+                <span>Label pattern (use {n} for the sequence)</span>
+                <input
+                  v-model="layer.titlePattern"
                   type="text"
-                  :placeholder="'Lesson {n}'"
-                  :disabled="!grouping.selected || submitting"
+                  :placeholder="'Item {n}'"
+                  :disabled="!layer.selected || submitting"
                 />
               </label>
             </li>

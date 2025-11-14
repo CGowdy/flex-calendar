@@ -180,3 +180,39 @@ Copy code
 - Rebuild policy:
   - Only rebuild containers in full mode when editing config/dependencies.
   - Rebuild a single service: `docker compose -f infra/docker-compose.full.yml up -d --build web` (or `api`).
+
+
+
+## Cursor Project Direction
+
+You are helping me evolve a repo called "Flex Calendar".
+
+Context:
+- This app is currently designed around a homeschool use case (Abeka curriculum + student calendars + holidays).
+- Under the hood, it already has:
+  - Calendar creation with generated "days" (e.g. Day 1..N).
+  - Groupings (Abeka, student A/B, holidays) with flags like autoShift / isChained.
+  - A scheduling engine that can reflow days when they’re moved, and skip weekends and holidays.
+  - Month / week / day calendar views with drag-and-drop and chain-aware moves.
+  - Markdown docs: implementation-status.md, product-spec.md, workflow.md, HowTo.md that describe the current behavior and roadmap.
+
+Goal:
+- Generalize the app into a **generic flexible calendar**:
+  - No hard-coded “Abeka”, “student A/B”, or homeschool-only naming in the core domain.
+  - Homeschool/Abeka becomes a **use-case / preset**, not the core mental model.
+  - The core concepts should be usable for any domain where people want chainable events in a calendar:
+    - lesson plans, content pipelines, fitness programs, etc.
+
+High-level direction:
+- Keep the **existing behavior and architecture** (reflowing days, skipping weekends/holidays, chain moves).
+- Refactor names and docs so the domain is generic.
+
+Use this vocabulary going forward:
+
+- **Calendar**: Top-level container, like in Google Calendar or iCal.
+- **Layer** (was "grouping"): A logical track within a calendar (e.g. “Math plan”, “Actual progress for Kid A”, “Holidays”). Different layers can be displayed together on the calendar.
+- **Template item**: A step in an ordered sequence that is not yet tied to a specific date. This is the generic version of “Abeka Day N”.
+- **Scheduled item**: A concrete item on a specific date in a specific layer (what most calendar apps call an “event” or “entry”). This is what gets moved around by the user.
+- **Chain**: A group of scheduled items that should move together according to chain rules.
+- **Chain behavior**: Rules for how a chain reflows (shift following items, respect weekends/holidays, etc.).
+- **Exception**: A date that should be excluded or treated specially (holidays, sick days, blackout dates). Often implemented as a Holidays layer, but the engine should treat them generically as exceptions.

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import type { Calendar, CalendarDay } from '@/features/calendar/types/calendar'
+import type { Calendar, ScheduledItem } from '@/features/calendar/types/calendar'
 
 const props = defineProps<{
   calendar: Calendar
@@ -9,13 +9,16 @@ const props = defineProps<{
 
 // No emits for now
 
-const selectedDay = computed<CalendarDay | null>(() => {
+const selectedItem = computed<ScheduledItem | null>(() => {
   if (!props.selectedDayId) return null
-  return props.calendar.days.find((d) => d.id === props.selectedDayId) ?? null
+  return (
+    props.calendar.scheduledItems.find((item) => item.id === props.selectedDayId) ??
+    null
+  )
 })
 
 const dayLabel = computed(() => {
-  const date = selectedDay.value ? new Date(selectedDay.value.date) : null
+  const date = selectedItem.value ? new Date(selectedItem.value.date) : null
   return date
     ? new Intl.DateTimeFormat(undefined, {
         weekday: 'long',
@@ -33,26 +36,26 @@ const dayLabel = computed(() => {
       <h3>{{ dayLabel }}</h3>
     </header>
 
-    <div v-if="selectedDay" class="day__content">
+    <div v-if="selectedItem" class="day__content">
       <div class="card">
         <div class="row">
           <span class="muted">Label</span>
-          <strong>{{ selectedDay.label }}</strong>
+          <strong>{{ selectedItem.label }}</strong>
         </div>
         <div class="row">
           <span class="muted">Track</span>
-          <strong>{{ selectedDay.groupingKey }}</strong>
+          <strong>{{ selectedItem.layerKey }}</strong>
         </div>
         <div class="row">
           <span class="muted">Date</span>
-          <strong>{{ new Date(selectedDay.date).toLocaleDateString() }}</strong>
+          <strong>{{ new Date(selectedItem.date).toLocaleDateString() }}</strong>
         </div>
       </div>
 
       <div class="card">
         <h4>Events</h4>
         <ul class="events">
-          <li v-for="ev in selectedDay.events" :key="ev.id" class="event">
+          <li v-for="ev in selectedItem.events" :key="ev.id" class="event">
             <strong>{{ ev.title }}</strong>
             <p v-if="ev.description">{{ ev.description }}</p>
           </li>
@@ -60,7 +63,7 @@ const dayLabel = computed(() => {
       </div>
     </div>
 
-    <p v-else class="muted">Select a day to see details.</p>
+    <p v-else class="muted">Select an item to see details.</p>
   </section>
 </template>
 

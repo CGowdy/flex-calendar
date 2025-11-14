@@ -1,10 +1,10 @@
 # Flex Calendar – Product Spec
 
-A planning tool to align homeschooling days with the Abeka reference schedule while adapting to real-life changes (late starts, holidays, sick days, and catch-up plans).
+A planning tool for any chainable schedule—lesson plans, content pipelines, or training ramps. Flex Calendar keeps layered plans in sync (reference vs progress vs exception layers) while respecting real-life adjustments like time off, accelerations, or catch-up strategies.
 
 > **ADR-lite (2025-11-14)**
 > Context: Chain-move reflow now respects weekends/holidays.
-> Decision: Update implementation status + roadmap emphasis (holiday CRUD, Abeka delta).
+> Decision: Update implementation status + roadmap emphasis (exception CRUD, reference layer deltas).
 > Consequences: MVP focus shifts to data/UX gaps instead of core chaining behavior.
 
 ## Status Legend
@@ -20,8 +20,8 @@ A planning tool to align homeschooling days with the Abeka reference schedule wh
 - [ ] Holidays: add/remove and reflow schedule - **~20%**: No holiday CRUD UI/API; exclusion depends on nonexistent data.
 - [ ] Catch-up Planner: rules, forecast, apply - **0%**: Not started
 - [ ] Sick/Off days marking and reflow - **0%**: Not started
-- [~] Timeline/Dashboard with Abeka delta and projections - **~30%**: Basic stats exist, but no Abeka comparison/delta
-- [x] Per-student calendars (Abeka, Holidays, Student A/B/C) - **~90%**: Groupings work, but no Abeka reference tracking
+- [~] Timeline/Dashboard with reference layer delta and projections - **~30%**: Basic stats exist, but no reference comparison/delta
+- [x] Layered calendars (reference, progress, exceptions) - **~90%**: Layers work, but no reference layer delta tracking
 - [x] Calendar-level chaining toggle (`isChained`); Holidays non-chained - **~95%**: `autoShift` property works and smart reflow honors it; still needs holiday CRUD to make exclusions meaningful.
 - [ ] Fractional days via split (1 of 2, 2 of 2) - **0%**: Not started
 - [ ] ICS export (subscribe in Google/iCal) - **0%**: Future (v1.2)
@@ -43,15 +43,15 @@ Make it fast and safe to plan 170+ school days, auto-label days (Day 1…Day 170
 
 ## Glossary
 
-- Abeka Reference: The ideal, official progression (e.g., “Day 52 on today’s date”).
-- School Day: A numbered instructional day (Day 1…Day N) in the user’s plan.
-- Holiday: A non-school day; the schedule skips these automatically.
-- Calendar: A named collection of dated entries (e.g., Abeka, Holidays, Student A, Student B).
-- Chaining Calendar: A calendar that enforces sequential order; when one entry moves, subsequent entries reflow (e.g., Abeka and Student calendars).
-- Non-chaining Calendar: A calendar whose entries are independent (e.g., Holidays).
-- Chain Move: Moving a single day to another date shifts all subsequent days in order.
-- Catch-up Plan: Temporary rule set (e.g., “double days on Tue/Thu”) to accelerate progress.
-- Forecast: Predicted calendar end date or when parity with Abeka is reached.
+- Reference Layer: The ideal progression (template sequence) driving deltas and forecasts.
+- Scheduled Item: A dated instance on any layer (was “school day”).
+- Exception Layer: A layer containing blackout or pause dates; other layers skip these dates.
+- Calendar: A container of layers (reference, progress, exception, scenario).
+- Linked Layer: A layer whose items reflow sequentially when one item moves.
+- Independent Layer: A layer whose items stay put when other layers move (e.g., exceptions).
+- Chain Move: Moving a single scheduled item reassigns subsequent items in linked layers.
+- Catch-up Plan: Temporary rule set (e.g., “Tue/Thu = +1 item/day”) to accelerate progress.
+- Forecast: Predicted calendar end date or when parity with the reference layer is reached.
 
 ## Goals
 
@@ -60,12 +60,18 @@ Make it fast and safe to plan 170+ school days, auto-label days (Day 1…Day 170
 - Define repeating patterns with auto-incremented labels (e.g., “Day {number}” x170).
 - Plan catch-up strategies (double days, 1.5 days) and forecast their impact.
 - Quickly mark sick/closed days and reflow the remaining schedule.
-- Manage multiple calendars: Abeka (reference), Holidays (non-chaining), and per-student calendars (A/B/C) with chaining enabled.
+- Manage multiple layers: reference (linked), progress (linked), exception (independent), plus optional scenario layers.
 - Optional export to personal calendars (ICS/Google) for daily reference. (Future)
+
+## Examples / Use Cases
+
+- **Homeschool preset (e.g., Abeka, BJU, CC)** – Reference layer mirrors curriculum pacing, progress layers track each student, and an exception layer blocks out holidays or sick weeks.
+- **Editorial/content pipeline** – Reference layer outlines the planned publish cadence, each channel/product has a progress layer, and exception layer captures content freezes/embargoes.
+- **Fitness or training blocks** – Reference layer captures the planned workouts, progress layers log actual completion, and an exception layer tracks deload weeks, injuries, or travel.
 
 ## Non-Goals (for now)
 
-- Full Abeka content import (lessons/materials).
+- Full preset content import (lessons/materials).
 - Multi-user auth/roles.
 - Complex timetable per-subject.
 
@@ -92,21 +98,21 @@ Make it fast and safe to plan 170+ school days, auto-label days (Day 1…Day 170
 5) Catch-up Planning and Forecasting
 - Define rules per date range: e.g., “On Tue/Thu do 2 days”, “On Mon do 1.5 days”.
 - Constraints: maximum per-day “load”, allowed weekdays.
-- Preview scenario and see predicted “reach-parity date” vs Abeka and final end date.
+- Preview scenario and see predicted “reach-parity date” vs the reference layer and final end date.
 - Apply scenario to commit changes (creates reflowed dates).
 
 6) Sick/Off Days
 - Mark one or more dates as “no school” → reflows the remaining schedule.
 
 7) Timeline/Dashboard
-- Shows current day vs Abeka reference day, delta (behind/ahead).
+- Shows current scheduled item vs the reference layer item, delta (behind/ahead).
 - Displays forecast end date and milestones.
 
 8) Export (Future)
 - ICS export of user schedule to subscribe in Google/iCal.
 
 9) Calendars & Tracks
-- Support multiple calendars: Abeka (reference), Holidays (non-chaining), Student A/B/C (chaining).
+- Support multiple layers: reference (linked), exceptions (independent), and any number of progress layers (linked).
 - Calendar-level setting `isChained` determines whether moves reflow subsequent entries.
 - Holidays calendar acts as an exclusion source for scheduling; its events do not reflow.
 
@@ -122,7 +128,7 @@ Make it fast and safe to plan 170+ school days, auto-label days (Day 1…Day 170
 - System reassigns Day 66…Day 170 to subsequent valid dates (skip holidays/weekends).
 
 3) Catch-up planning when behind
-- From dashboard, see “You are on Day 11; Abeka is at Day 52 (−41).”
+- From dashboard, see “You are on Item 11; Reference layer is at Item 52 (−41).”
 - Open Catch-up Planner, add a rule: “Tue/Thu = 2 days/day” for the next 4 weeks.
 - Preview forecast; accept to apply → dates reflow and dashboard updates parity estimate.
 
@@ -132,7 +138,7 @@ Make it fast and safe to plan 170+ school days, auto-label days (Day 1…Day 170
 
 5) Per-student planning
 - Create Student A/B/C calendars (chaining on).
-- Move a student day; only that student calendar reflows (Abeka reference remains a guide).
+- Move a progress layer item; only that layer reflows (the reference layer remains the guide).
 - Holidays calendar is visible and used for exclusions but does not reflow.
 
 ## Acceptance Criteria
@@ -158,7 +164,7 @@ Holidays
 - Removing a holiday reflows forward days back into available dates.
 
 Catch-up Forecast
-- Given current day is 11 and Abeka is day 52, when I apply “Tue/Thu = 2 days/day” for 4 weeks, then:
+- Given current item is 11 and the reference layer is item 52, when I apply “Tue/Thu = 2 items/day” for 4 weeks, then:
   - A forecast displays a new parity date and new projected end date.
   - On Tue/Thu in that range, total assigned “load” per day equals 2 days (or 1.5 for fractional settings).
   - Applying the plan updates the schedule accordingly and keeps labels consistent.
@@ -167,7 +173,7 @@ Sick Days
 - Marking a sick-day range removes those dates from valid school days and reflows subsequent days.
 
 Timeline/Dashboard
-- After any change, the dashboard shows current day index, delta vs Abeka, and projected end date.
+- After any change, the dashboard shows current item index, delta vs the reference layer, and projected end date.
 
 ICS Export (Future)
 - A generated ICS reflects the current schedule (labels, dates, times), subscribable by Google/iCal.
@@ -175,7 +181,7 @@ ICS Export (Future)
 Calendars and Chaining
 - When a calendar has `isChained=true`, moving any entry causes subsequent entries in that calendar to reflow; when `isChained=false`, the move does not affect other entries.
 - The Holidays calendar acts as an exclusion set for scheduling; its events never reflow other calendars directly.
-- Student calendars reflow independently from one another; Abeka calendar is used for delta/forecast reference.
+- Progress layers reflow independently from one another; the reference layer is used for delta/forecast reference.
 
 ## Technical Notes (aligns with current code)
 
@@ -208,7 +214,7 @@ Constraints
 MVP
 - Setup Wizard with generation (days, weekdays, holidays, labels).
 - Chain Move via drag/drop or date picker.
-- Dashboard with delta vs Abeka and projected end date.
+- Dashboard with delta vs the reference layer and projected end date.
 - Sick/holiday marking and reflow.
 - Per-student calendars with calendar-level chaining toggle.
 

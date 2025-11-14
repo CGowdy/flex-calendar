@@ -8,21 +8,20 @@ function makeCalendar(): Calendar {
   return {
     id: 'cal-1',
     name: 'CT Calendar',
-    source: 'custom',
+    presetKey: 'ct',
     startDate: '2025-11-01T00:00:00.000Z',
-    totalDays: 2,
     includeWeekends: false,
-    includeHolidays: false,
-    groupings: [
-      { key: 'abeka', name: 'Abeka', color: '#2563eb', description: '', autoShift: true },
-      { key: 'holidays', name: 'Holidays', color: '#ca8a04', description: '', autoShift: false },
+    includeExceptions: false,
+    layers: [
+      { key: 'reference', name: 'Reference', color: '#2563eb', description: '', chainBehavior: 'linked', kind: 'standard' },
+      { key: 'exceptions', name: 'Exceptions', color: '#ca8a04', description: '', chainBehavior: 'independent', kind: 'exception' },
     ],
-    days: [
+    scheduledItems: [
       {
         id: 'd1',
         date: '2025-11-10T00:00:00.000Z',
-        groupingKey: 'abeka',
-        groupingSequence: 1,
+        layerKey: 'reference',
+        sequenceIndex: 1,
         label: 'Day 1',
         notes: '',
         events: [{ id: 'e1', title: 'Lesson 1', description: '', durationDays: 1, metadata: {} }],
@@ -30,8 +29,8 @@ function makeCalendar(): Calendar {
       {
         id: 'd2',
         date: '2025-11-11T00:00:00.000Z',
-        groupingKey: 'abeka',
-        groupingSequence: 2,
+        layerKey: 'reference',
+        sequenceIndex: 2,
         label: 'Day 2',
         notes: '',
         events: [{ id: 'e2', title: 'Lesson 2', description: '', durationDays: 1, metadata: {} }],
@@ -59,7 +58,7 @@ test.skip('renders calendars list and mini calendar', async ({ mount }) => {
 
   await expect(component.getByRole('heading', { name: calendar.name })).toBeVisible()
   await expect(component.getByText('Calendars')).toBeVisible()
-  await expect(component.getByLabel('Abeka')).toBeVisible()
+  await expect(component.getByLabel('Reference')).toBeVisible()
 })
 
 

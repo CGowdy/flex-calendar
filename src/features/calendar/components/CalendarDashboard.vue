@@ -1,9 +1,14 @@
 <script setup lang="ts">
+// ADR-Lite
+// Context: Calendar creation forced everyone through the setup wizard modal.
+// Decision: Default to an inline quick-add form with an optional wizard entry point.
+// Consequences: Experienced users create calendars faster while the guided flow remains available.
 import { computed, onMounted, ref, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 
 import { useCalendarStore } from '@stores/useCalendarStore'
 import SetupWizard from './SetupWizard.vue'
+import CalendarQuickAddForm from './CalendarQuickAddForm.vue'
 import CalendarTimeline from './CalendarTimeline.vue'
 import DraggableCalendarGrid from './DraggableCalendarGrid.vue'
 import MonthCalendar from './MonthCalendar.vue'
@@ -12,7 +17,7 @@ import DayCalendar from './DayCalendar.vue'
 import type {
   Calendar,
   CreateCalendarRequest,
-  ShiftCalendarDaysRequest,
+  ShiftScheduledItemsRequest,
 } from '@/features/calendar/types/calendar'
 
 const calendarStore = useCalendarStore()
@@ -22,10 +27,11 @@ const {
   activeCalendarId,
   isLoading,
   errorMessage,
-  visibleGroupingKeys,
+  visibleLayerKeys,
 } = storeToRefs(calendarStore)
 
 const showSetupWizard = ref(false)
+const showQuickAdd = ref(false)
 const selectedDayId = ref<string | null>(null)
 const isSubmitting = ref(false)
 const shiftInProgress = ref(false)
@@ -48,10 +54,21 @@ onMounted(async () => {
     if (firstCalendar) {
       await calendarStore.loadCalendar(firstCalendar.id)
     }
+    showQuickAdd.value = false
   } else {
-    showSetupWizard.value = true
+    showQuickAdd.value = true
   }
 })
+
+watch(
+  calendars,
+  (next) => {
+    if (next.length === 0) {
+      showQuickAdd.value = true
+    }
+  },
+  { immediate: true }
+)
 
 watch(
   selectedCalendar,
@@ -61,23 +78,47 @@ watch(
       return
     }
 
-    const stillExists = calendar.days.some(
-      (day) => day.id === selectedDayId.value
+    const stillExists = calendar.scheduledItems.some(
+      (item) => item.id === selectedDayId.value
     )
     if (!stillExists) {
-      selectedDayId.value = calendar.days[0]?.id ?? null
+      selectedDayId.value = calendar.scheduledItems[0]?.id ?? null
     }
   },
   { immediate: true }
 )
 
 function openSetupWizard() {
+  showQuickAdd.value = false
   showSetupWizard.value = true
 }
 
 function closeSetupWizard() {
   if (!isSubmitting.value) {
     showSetupWizard.value = false
+  }
+}
+
+function openQuickAdd() {
+  showSetupWizard.value = false
+  showQuickAdd.value = true
+}
+
+function closeQuickAdd() {
+  if (!isSubmitting.value) {
+    showQuickAdd.value = false
+  }
+}
+
+function toggleQuickAdd() {
+  if (isSubmitting.value) {
+    return
+  }
+
+  if (showQuickAdd.value) {
+    closeQuickAdd()
+  } else {
+    openQuickAdd()
   }
 }
 
@@ -96,30 +137,41 @@ async function handleSetupSubmit(payload: CreateCalendarRequest) {
   try {
     const calendar = await calendarStore.createCalendarAndSelect(payload)
     showSetupWizard.value = false
-    selectedDayId.value = calendar.days[0]?.id ?? null
+    selectedDayId.value = calendar.scheduledItems[0]?.id ?? null
   } finally {
     isSubmitting.value = false
   }
 }
 
-function handleSelectDay(dayId: string) {
-  selectedDayId.value = dayId
+async function handleQuickAddSubmit(payload: CreateCalendarRequest) {
+  isSubmitting.value = true
+  try {
+    const calendar = await calendarStore.createCalendarAndSelect(payload)
+    showQuickAdd.value = false
+    selectedDayId.value = calendar.scheduledItems[0]?.id ?? null
+  } finally {
+    isSubmitting.value = false
+  }
 }
 
-async function handleShiftCalendar(payload: ShiftCalendarDaysRequest) {
+function handleSelectDay(scheduledItemId: string) {
+  selectedDayId.value = scheduledItemId
+}
+
+async function handleShiftCalendar(payload: ShiftScheduledItemsRequest) {
   if (!selectedCalendar.value) {
     return
   }
 
   shiftInProgress.value = true
   try {
-    const updated = await calendarStore.shiftCalendarDay(payload)
+    const updated = await calendarStore.shiftScheduledItem(payload)
     if (updated && selectedDayId.value) {
-      const stillExists = updated.days.some(
-        (day) => day.id === selectedDayId.value
+      const stillExists = updated.scheduledItems.some(
+        (item) => item.id === selectedDayId.value
       )
       if (!stillExists) {
-        selectedDayId.value = updated.days[0]?.id ?? null
+        selectedDayId.value = updated.scheduledItems[0]?.id ?? null
       }
     }
   } finally {
@@ -133,10 +185,9 @@ async function handleShiftCalendar(payload: ShiftCalendarDaysRequest) {
   <div class="dashboard">
     <section class="dashboard__header">
       <div>
-        <h1>Academic Planner</h1>
+        <h1>Flex Calendar</h1>
         <p class="dashboard__subtitle">
-          Adjust lessons, track make-up days, and stay aligned with Abeka's
-          pacing.
+          Adjust chainable schedules, track exceptions, and keep every layer in sync.
         </p>
       </div>
       <div class="dashboard__actions">
@@ -159,13 +210,21 @@ async function handleShiftCalendar(payload: ShiftCalendarDaysRequest) {
 
         <button
           type="button"
-          class="primary-button"
+          class="ghost-button"
           :disabled="isBusy"
           @click="openSetupWizard"
         >
-          New Calendar
+          Use Setup Wizard
         </button>
       </div>
+    </section>
+
+    <section v-if="showQuickAdd && !hasCalendars" class="quick-add-section">
+      <CalendarQuickAddForm
+        :submitting="isSubmitting"
+        @submit="handleQuickAddSubmit"
+        @cancel="closeQuickAdd"
+      />
     </section>
 
     <div
@@ -181,9 +240,14 @@ async function handleShiftCalendar(payload: ShiftCalendarDaysRequest) {
         :calendar="selectedCalendar"
         :selected-day-id="selectedDayId"
         :view-date="viewDate"
+        :quick-add-open="showQuickAdd"
+        :quick-add-submitting="isSubmitting"
         @update:viewDate="(d: Date) => viewDate = d"
         @jump="(d: Date) => { viewMode = 'month'; viewDate = d }"
         @select-day="handleSelectDay"
+        @toggle-quick-add="toggleQuickAdd"
+        @submit-quick-add="handleQuickAddSubmit"
+        @cancel-quick-add="closeQuickAdd"
       />
 
       <div class="content-right">
@@ -227,7 +291,7 @@ async function handleShiftCalendar(payload: ShiftCalendarDaysRequest) {
           :calendar="selectedCalendar"
           :selected-day-id="selectedDayId"
           :view-date="viewDate"
-          :visible-grouping-keys="visibleGroupingKeys"
+          :visible-layer-keys="visibleLayerKeys"
           @select-day="handleSelectDay"
           @shift-day="handleShiftCalendar"
           @update:viewDate="(d: Date) => viewDate = d"
@@ -237,7 +301,7 @@ async function handleShiftCalendar(payload: ShiftCalendarDaysRequest) {
           v-else-if="viewMode === 'week'"
           :calendar="selectedCalendar"
           :selected-day-id="selectedDayId"
-          :visible-grouping-keys="visibleGroupingKeys"
+          :visible-layer-keys="visibleLayerKeys"
           @select-day="handleSelectDay"
         />
 
@@ -252,6 +316,7 @@ async function handleShiftCalendar(payload: ShiftCalendarDaysRequest) {
           v-else
           :calendar="selectedCalendar"
           :selected-day-id="selectedDayId"
+          :visible-layer-keys="visibleLayerKeys"
           :disabled="isBusy"
           @select-day="handleSelectDay"
           @shift-day="handleShiftCalendar"
@@ -260,15 +325,28 @@ async function handleShiftCalendar(payload: ShiftCalendarDaysRequest) {
     </section>
 
     <section v-else-if="!isLoading" class="empty-state">
-      <p>Start by creating your first calendar to import Abeka lessons.</p>
-      <button
-        type="button"
-        class="primary-button"
-        :disabled="isBusy"
-        @click="openSetupWizard"
-      >
-        Launch Setup Wizard
-      </button>
+      <p>
+        Start by creating your first calendar. Use quick add for defaults or the
+        setup wizard if you want the guided experience.
+      </p>
+      <div class="empty-state__actions">
+        <button
+          type="button"
+          class="primary-button"
+          :disabled="isBusy"
+          @click="openQuickAdd"
+        >
+          Open Quick Add
+        </button>
+        <button
+          type="button"
+          class="ghost-button"
+          :disabled="isBusy"
+          @click="openSetupWizard"
+        >
+          Use Setup Wizard
+        </button>
+      </div>
     </section>
 
     <div v-if="isBusy" class="loading-indicator" role="status">
@@ -313,6 +391,7 @@ async function handleShiftCalendar(payload: ShiftCalendarDaysRequest) {
   display: flex;
   gap: 0.75rem;
   align-items: center;
+  flex-wrap: wrap;
 }
 
 .calendar-select {
@@ -321,6 +400,24 @@ async function handleShiftCalendar(payload: ShiftCalendarDaysRequest) {
   border-radius: 0.5rem;
   border: 1px solid var(--color-border);
   background: var(--color-background);
+}
+
+.ghost-button {
+  border: 1px solid var(--color-border);
+  background: transparent;
+  color: var(--color-text);
+  padding: 0.5rem 1rem;
+  border-radius: 0.75rem;
+  cursor: pointer;
+}
+
+.ghost-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.ghost-button:not(:disabled):hover {
+  background: rgba(37, 99, 235, 0.08);
 }
 
 .primary-button {
@@ -397,6 +494,29 @@ async function handleShiftCalendar(payload: ShiftCalendarDaysRequest) {
   border-radius: 1rem;
   background: var(--color-background-soft);
   text-align: center;
+}
+
+.empty-state__actions {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.quick-add-section {
+  animation: fadeIn 0.2s ease;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .loading-indicator {

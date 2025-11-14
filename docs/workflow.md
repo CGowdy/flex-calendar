@@ -86,7 +86,7 @@ bun run seed:sample
 
 Auth note for Mongo (dev):
 - When using Dockerized Mongo with the root user from `.env.mongo`, use `authSource=admin` in `MONGODB_URI`, e.g.  
-  `mongodb://root:example@localhost:27017/my-abeka-calendar?authSource=admin&authMechanism=DEFAULT`
+  `mongodb://root:example@localhost:27017/flex-calendar?authSource=admin&authMechanism=DEFAULT`
 
 ## Branching and PRs (Lightweight)
 

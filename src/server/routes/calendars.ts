@@ -4,14 +4,14 @@ import { z } from 'zod'
 import {
   calendarIdParamsSchema,
   createCalendarSchema,
-  shiftCalendarDaysSchema,
+  shiftScheduledItemsSchema,
   updateCalendarSchema,
 } from '../schemas/calendarSchemas.js'
 import {
   createCalendar,
   getCalendarById,
   listCalendars,
-  shiftCalendarDays,
+  shiftScheduledItems,
   updateCalendar,
 } from '../services/calendarService.js'
 
@@ -48,9 +48,9 @@ export async function calendarsRoutes(app: FastifyInstance) {
 
   app.post('/:calendarId/shift', async (request) => {
     const params = calendarIdParamsSchema.parse(request.params)
-    const body = shiftCalendarDaysSchema.parse(request.body)
+    const body = shiftScheduledItemsSchema.parse(request.body)
 
-    const calendar = await shiftCalendarDays(params.calendarId, body)
+    const calendar = await shiftScheduledItems(params.calendarId, body)
     if (!calendar) {
       throw app.httpErrors.notFound('Calendar or day not found')
     }

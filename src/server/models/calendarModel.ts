@@ -44,17 +44,17 @@ const CalendarEventSchema = new Schema<CalendarEvent>(
   }
 )
 
-export interface CalendarDay {
+export interface ScheduledItem {
   _id: string
   date: Date
-  groupingKey: string
-  groupingSequence: number
+  layerKey: string
+  sequenceIndex: number
   label: string
   notes: string
   events: CalendarEvent[]
 }
 
-const CalendarDaySchema = new Schema<CalendarDay>(
+const ScheduledItemSchema = new Schema<ScheduledItem>(
   {
     _id: {
       type: String,
@@ -64,14 +64,16 @@ const CalendarDaySchema = new Schema<CalendarDay>(
       type: Date,
       required: true,
     },
-    groupingKey: {
+    layerKey: {
       type: String,
       required: true,
+      alias: 'groupingKey',
     },
-    groupingSequence: {
+    sequenceIndex: {
       type: Number,
       required: true,
       min: 1,
+      alias: 'groupingSequence',
     },
     label: {
       type: String,
@@ -94,15 +96,16 @@ const CalendarDaySchema = new Schema<CalendarDay>(
   }
 )
 
-export interface CalendarGrouping {
+export interface CalendarLayer {
   key: string
   name: string
   color: string
   autoShift: boolean
   description: string
+  kind?: 'standard' | 'exception'
 }
 
-const CalendarGroupingSchema = new Schema<CalendarGrouping>(
+const CalendarLayerSchema = new Schema<CalendarLayer>(
   {
     key: {
       type: String,
@@ -128,6 +131,11 @@ const CalendarGroupingSchema = new Schema<CalendarGrouping>(
       default: '',
       trim: true,
     },
+    kind: {
+      type: String,
+      enum: ['standard', 'exception'],
+      default: 'standard',
+    },
   },
   {
     _id: false,
@@ -137,13 +145,15 @@ const CalendarGroupingSchema = new Schema<CalendarGrouping>(
 
 export interface Calendar {
   name: string
-  source: 'abeka' | 'custom'
+  presetKey?: string
+  source?: 'abeka' | 'custom' // legacy alias
   startDate: Date
   totalDays: number
   includeWeekends: boolean
-  includeHolidays: boolean
-  groupings: CalendarGrouping[]
-  days: CalendarDay[]
+  includeHolidays?: boolean // legacy alias
+  includeExceptions: boolean
+  layers: CalendarLayer[]
+  scheduledItems: ScheduledItem[]
 }
 
 const CalendarSchema = new Schema<Calendar>(
@@ -153,10 +163,10 @@ const CalendarSchema = new Schema<Calendar>(
       required: true,
       trim: true,
     },
-    source: {
+    presetKey: {
       type: String,
-      enum: ['abeka', 'custom'],
-      default: 'custom',
+      default: '',
+      alias: 'source',
     },
     startDate: {
       type: Date,
@@ -171,17 +181,20 @@ const CalendarSchema = new Schema<Calendar>(
       type: Boolean,
       default: false,
     },
-    includeHolidays: {
+    includeExceptions: {
       type: Boolean,
       default: false,
+      alias: 'includeHolidays',
     },
-    groupings: {
-      type: [CalendarGroupingSchema],
+    layers: {
+      type: [CalendarLayerSchema],
       default: () => [],
+      alias: 'groupings',
     },
-    days: {
-      type: [CalendarDaySchema],
+    scheduledItems: {
+      type: [ScheduledItemSchema],
       default: () => [],
+      alias: 'days',
     },
   },
   {
@@ -192,7 +205,7 @@ const CalendarSchema = new Schema<Calendar>(
 
 CalendarSchema.index({ name: 1 }, { unique: false })
 
-type CalendarDayWithInternalIds = CalendarDay & {
+type ScheduledItemWithInternalIds = ScheduledItem & {
   _id?: string
   id?: string
   events?: Array<CalendarEvent & { _id?: string; id?: string }>
@@ -205,7 +218,7 @@ CalendarSchema.set('toJSON', {
     const calendarRet = (ret as unknown) as Record<string, unknown> & {
       _id?: string
       id?: string
-      days?: CalendarDayWithInternalIds[]
+      scheduledItems?: ScheduledItemWithInternalIds[]
     }
 
     if (calendarRet._id) {
@@ -213,10 +226,10 @@ CalendarSchema.set('toJSON', {
       delete calendarRet._id
     }
 
-    if (Array.isArray(calendarRet.days)) {
-      calendarRet.days = calendarRet.days.map((day) => {
-        const normalizedEvents = Array.isArray(day.events)
-          ? day.events.map((event) => ({
+    if (Array.isArray(calendarRet.scheduledItems)) {
+      calendarRet.scheduledItems = calendarRet.scheduledItems.map((item) => {
+        const normalizedEvents = Array.isArray(item.events)
+          ? item.events.map((event) => ({
               ...((event as unknown) as Record<string, unknown>),
               id: (event as CalendarEvent).id ?? (event as CalendarEvent)._id ?? nanoid(),
               _id: undefined,
@@ -224,12 +237,19 @@ CalendarSchema.set('toJSON', {
           : []
 
         return {
-          ...((day as unknown) as Record<string, unknown>),
-          id: (day as CalendarDayWithInternalIds).id ?? (day as CalendarDayWithInternalIds)._id ?? nanoid(),
+          ...((item as unknown) as Record<string, unknown>),
+          id:
+            (item as ScheduledItemWithInternalIds).id ??
+            (item as ScheduledItemWithInternalIds)._id ??
+            nanoid(),
           _id: undefined,
           events: normalizedEvents as unknown as CalendarEvent[],
-        } as unknown as CalendarDayWithInternalIds
+        } as unknown as ScheduledItemWithInternalIds
       })
+    }
+
+    if (!calendarRet.scheduledItems && Array.isArray(calendarRet.days)) {
+      calendarRet.scheduledItems = calendarRet.days
     }
 
     return calendarRet

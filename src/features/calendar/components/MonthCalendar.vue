@@ -1,19 +1,23 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
-import type { Calendar, CalendarDay } from '@/features/calendar/types/calendar'
+import type { Calendar, ScheduledItem } from '@/features/calendar/types/calendar'
 
 const props = defineProps<{
   calendar: Calendar
   selectedDayId: string | null
   viewDate?: Date
-  visibleGroupingKeys?: string[]
+  visibleLayerKeys?: string[]
 }>()
 
 const emit = defineEmits<{
   (event: 'select-day', dayId: string): void
   (
     event: 'shift-day',
-    payload: { dayId: string; shiftByDays: number; groupingKeys?: string[] }
+    payload: {
+      scheduledItemId: string
+      shiftByDays: number
+      layerKeys?: string[]
+    }
   ): void
   (event: 'update:viewDate', d: Date): void
 }>()
@@ -30,16 +34,16 @@ const suppressClicks = ref(false)
 
 const dayKey = (d: Date) => d.toISOString().slice(0, 10)
 
-const dayMap = computed<Record<string, CalendarDay[]>>(() => {
-  const map: Record<string, CalendarDay[]> = {}
-  const allow = props.visibleGroupingKeys
-    ? new Set(props.visibleGroupingKeys)
+const scheduledItemsByDate = computed<Record<string, ScheduledItem[]>>(() => {
+  const map: Record<string, ScheduledItem[]> = {}
+  const allow = props.visibleLayerKeys
+    ? new Set(props.visibleLayerKeys)
     : null
-  for (const day of props.calendar.days) {
-    if (allow && !allow.has(day.groupingKey)) continue
-    const key = dayKey(new Date(day.date))
+  for (const item of props.calendar.scheduledItems) {
+    if (allow && !allow.has(item.layerKey)) continue
+    const key = dayKey(new Date(item.date))
     if (!map[key]) map[key] = []
-    map[key].push(day)
+    map[key]!.push(item)
   }
   return map
 })
@@ -114,13 +118,13 @@ function daysBetween(aIso: string, b: Date): number {
   return Math.round((bUtc - aUtc) / 86400000)
 }
 
-function handleDragStart(day: CalendarDay, ev: DragEvent) {
+function handleDragStart(item: ScheduledItem, ev: DragEvent) {
   if (!ev.dataTransfer) return
   isDragging.value = true
   const payload = JSON.stringify({
-    dayId: day.id,
-    date: day.date,
-    groupingKey: day.groupingKey,
+    scheduledItemId: item.id,
+    date: item.date,
+    layerKey: item.layerKey,
   })
   // Set multiple types for cross-browser compatibility
   ev.dataTransfer.setData('application/json', payload)
@@ -158,16 +162,16 @@ function handleDrop(date: Date, ev: DragEvent) {
   if (!payload) return
   try {
     const data = JSON.parse(payload || (fallback ?? '')) as {
-      dayId: string
+      scheduledItemId: string
       date: string
-      groupingKey?: string
+      layerKey?: string
     }
     const delta = daysBetween(data.date, date)
     if (delta !== 0) {
       emit('shift-day', {
-        dayId: data.dayId,
+        scheduledItemId: data.scheduledItemId,
         shiftByDays: delta,
-        groupingKeys: data.groupingKey ? [data.groupingKey] : undefined,
+        layerKeys: data.layerKey ? [data.layerKey] : undefined,
       })
     }
   } catch {
@@ -183,7 +187,7 @@ function handleDrop(date: Date, ev: DragEvent) {
   }, 300)
 }
 
-function handleEventClick(day: CalendarDay, ev: MouseEvent) {
+function handleEventClick(item: ScheduledItem, ev: MouseEvent) {
   if (isDragging.value || suppressClicks.value) {
     ev.preventDefault()
     ev.stopPropagation()
@@ -191,7 +195,7 @@ function handleEventClick(day: CalendarDay, ev: MouseEvent) {
       .stopImmediatePropagation?.()
     return
   }
-  emit('select-day', day.id)
+  emit('select-day', item.id)
 }
 
 function handleCaptureClick(ev: MouseEvent) {
@@ -234,24 +238,24 @@ function handleCaptureClick(ev: MouseEvent) {
 
           <ul class="events">
             <li
-              v-for="day in (dayMap[dayKey(date)] ?? [])"
-              :key="day.id"
+              v-for="item in (scheduledItemsByDate[dayKey(date)] ?? [])"
+              :key="item.id"
             >
               <button
                 type="button"
                 class="event"
-                :class="{ active: selectedDayId === day.id }"
-                @click="handleEventClick(day, $event)"
-                :title="day.events[0]?.title ?? day.label"
+                :class="{ active: selectedDayId === item.id }"
+                @click="handleEventClick(item, $event)"
+                :title="item.events[0]?.title ?? item.label"
                 draggable="true"
-                @dragstart="handleDragStart(day, $event)"
+                @dragstart="handleDragStart(item, $event)"
                 @dragend="isDragging = false"
               >
                 <span class="dot"
-                  :style="{ backgroundColor: (calendar.groupings.find(g => g.key === day.groupingKey)?.color) || '#2563eb' }"
+                  :style="{ backgroundColor: (calendar.layers.find(layer => layer.key === item.layerKey)?.color) || '#2563eb' }"
                 />
-                <span class="event__label">{{ day.label }}</span>
-                <span v-if="day.events[0]?.title" class="event__title">{{ day.events[0]?.title }}</span>
+                <span class="event__label">{{ item.label }}</span>
+                <span v-if="item.events[0]?.title" class="event__title">{{ item.events[0]?.title }}</span>
               </button>
             </li>
           </ul>

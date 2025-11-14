@@ -1,11 +1,11 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
-import type { Calendar, CalendarDay } from '@/features/calendar/types/calendar'
+import type { Calendar, ScheduledItem } from '@/features/calendar/types/calendar'
 
 const props = defineProps<{
   calendar: Calendar
   selectedDayId: string | null
-  visibleGroupingKeys?: string[]
+  visibleLayerKeys?: string[]
 }>()
 
 const emit = defineEmits<{
@@ -45,14 +45,14 @@ function dayKey(d: Date) {
   return d.toISOString().slice(0, 10)
 }
 
-const dayMap = computed<Record<string, CalendarDay[]>>(() => {
-  const map: Record<string, CalendarDay[]> = {}
-  const allow = props.visibleGroupingKeys ? new Set(props.visibleGroupingKeys) : null
-  for (const day of props.calendar.days) {
-    if (allow && !allow.has(day.groupingKey)) continue
-    const key = dayKey(new Date(day.date))
+const scheduledItemsByDate = computed<Record<string, ScheduledItem[]>>(() => {
+  const map: Record<string, ScheduledItem[]> = {}
+  const allow = props.visibleLayerKeys ? new Set(props.visibleLayerKeys) : null
+  for (const item of props.calendar.scheduledItems) {
+    if (allow && !allow.has(item.layerKey)) continue
+    const key = dayKey(new Date(item.date))
     if (!map[key]) map[key] = []
-    map[key].push(day)
+    map[key]!.push(item)
   }
   return map
 })
@@ -84,18 +84,18 @@ const headerLabel = computed(() => {
             {{ new Intl.DateTimeFormat(undefined, { month: 'short', day: 'numeric' }).format(date) }}
           </div>
           <ul class="events">
-            <li v-for="day in (dayMap[dayKey(date)] ?? [])" :key="day.id">
+            <li v-for="item in (scheduledItemsByDate[dayKey(date)] ?? [])" :key="item.id">
               <button
                 type="button"
                 class="event"
-                :class="{ active: selectedDayId === day.id }"
-                @click="emit('select-day', day.id)"
+                :class="{ active: selectedDayId === item.id }"
+                @click="emit('select-day', item.id)"
               >
                 <span class="dot"
-                  :style="{ backgroundColor: (calendar.groupings.find(g => g.key === day.groupingKey)?.color) || '#2563eb' }"
+                  :style="{ backgroundColor: (calendar.layers.find(layer => layer.key === item.layerKey)?.color) || '#2563eb' }"
                 />
-                <span class="event__label">{{ day.label }}</span>
-                <span v-if="day.events[0]?.title" class="event__title">{{ day.events[0]?.title }}</span>
+                <span class="event__label">{{ item.label }}</span>
+                <span v-if="item.events[0]?.title" class="event__title">{{ item.events[0]?.title }}</span>
               </button>
             </li>
           </ul>

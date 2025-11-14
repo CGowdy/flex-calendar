@@ -1,3 +1,7 @@
+export type ChainBehavior = 'linked' | 'independent'
+export type LayerKind = 'standard' | 'exception'
+export type LayerTemplateMode = 'generated' | 'manual'
+
 export interface CalendarEvent {
   id: string
   title: string
@@ -6,57 +10,65 @@ export interface CalendarEvent {
   metadata: Record<string, unknown>
 }
 
-export interface CalendarDay {
+export interface ScheduledItem {
   id: string
   date: string
-  groupingKey: string
-  groupingSequence: number
+  layerKey: string
+  sequenceIndex: number
   label: string
   notes: string
   events: CalendarEvent[]
 }
 
-export interface CalendarGrouping {
+export interface CalendarLayer {
   key: string
   name: string
   color: string
   description: string
-  autoShift: boolean
+  chainBehavior: ChainBehavior
+  kind: LayerKind
 }
 
 export interface Calendar {
   id: string
   name: string
-  source: 'abeka' | 'custom'
+  presetKey?: string
   startDate: string
-  totalDays: number
   includeWeekends: boolean
-  includeHolidays: boolean
-  groupings: CalendarGrouping[]
-  days: CalendarDay[]
+  includeExceptions: boolean
+  layers: CalendarLayer[]
+  scheduledItems: ScheduledItem[]
 }
 
 export type CalendarSummary = Pick<
   Calendar,
-  'id' | 'name' | 'startDate' | 'totalDays' | 'groupings'
+  'id' | 'name' | 'startDate' | 'layers'
 >
+
+export interface LayerTemplateConfig {
+  mode: LayerTemplateMode
+  itemCount?: number
+  titlePattern?: string
+}
+
+export interface CreateCalendarLayerInput {
+  key: string
+  name: string
+  color?: string
+  description?: string
+  chainBehavior?: ChainBehavior
+  kind?: LayerKind
+  templateConfig?: LayerTemplateConfig
+}
 
 export interface CreateCalendarRequest {
   name: string
-  source?: 'abeka' | 'custom'
+  presetKey?: string
   startDate: string
-  totalDays?: number
   includeWeekends?: boolean
-  includeHolidays?: boolean
-  groupings?: Array<
-    Pick<CalendarGrouping, 'key' | 'name' | 'autoShift'> & {
-      color?: string
-      description?: string
-      // Optional pattern used during generation, supports "{n}" placeholder
-      titlePattern?: string
-    }
-  >
-  eventsPerGrouping?: Record<
+  includeExceptions?: boolean
+  layers?: CreateCalendarLayerInput[]
+  templateItemsByLayer?: Record<
     string,
     Array<{
       title: string
@@ -66,21 +78,22 @@ export interface CreateCalendarRequest {
   >
 }
 
-export interface ShiftCalendarDaysRequest {
-  dayId: string
+export interface ShiftScheduledItemsRequest {
+  scheduledItemId: string
   shiftByDays: number
-  groupingKeys?: string[]
+  layerKeys?: string[]
 }
 
 export interface UpdateCalendarRequest {
-  groupings?: Array<{
+  layers?: Array<{
     key: string
     name?: string
     color?: string
     description?: string
-    autoShift?: boolean
+    chainBehavior?: ChainBehavior
+    kind?: LayerKind
   }>
   includeWeekends?: boolean
-  includeHolidays?: boolean
+  includeExceptions?: boolean
 }
 

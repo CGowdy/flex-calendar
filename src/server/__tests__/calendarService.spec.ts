@@ -6,7 +6,7 @@ let memoryServer: MongoMemoryServer
 let connectToDatabase: () => Promise<typeof import('mongoose')>
 let disconnectFromDatabase: () => Promise<void>
 let createCalendar: typeof import('../services/calendarService.js').createCalendar
-let shiftCalendarDays: typeof import('../services/calendarService.js').shiftCalendarDays
+let shiftScheduledItems: typeof import('../services/calendarService.js').shiftScheduledItems
 let getCalendarById: typeof import('../services/calendarService.js').getCalendarById
 let CalendarModel: typeof import('../models/calendarModel.js').CalendarModel
 import type { CalendarDTO } from '../types/calendar.js'
@@ -22,7 +22,7 @@ beforeAll(async () => {
   ;({ CalendarModel } = await import('../models/calendarModel.js'))
   ;({
     createCalendar,
-    shiftCalendarDays,
+    shiftScheduledItems,
     getCalendarById,
   } = await import('../services/calendarService.js'))
 
@@ -38,32 +38,52 @@ afterAll(async () => {
   await memoryServer.stop()
 })
 
-describe('calendarService.shiftCalendarDays', () => {
-  it('shifts downstream days for auto-shift groupings', async () => {
+describe('calendarService.shiftScheduledItems', () => {
+  it('shifts downstream items for linked layers', async () => {
     const calendar = await createCalendar({
       name: 'Test Calendar',
-      source: 'abeka',
       startDate: new Date('2025-08-04').toISOString(),
-      totalDays: 10,
       includeWeekends: false,
-      includeHolidays: false,
-      groupings: [
-        { key: 'abeka', name: 'Abeka', autoShift: true },
-        { key: 'student-a', name: 'Student A', autoShift: true },
-        { key: 'holidays', name: 'Holidays', autoShift: false },
+      includeExceptions: false,
+      layers: [
+        {
+          key: 'reference',
+          name: 'Reference',
+          chainBehavior: 'linked',
+          templateConfig: { mode: 'generated', itemCount: 10, titlePattern: 'Ref {n}' },
+        },
+        {
+          key: 'progress-a',
+          name: 'Progress A',
+          chainBehavior: 'linked',
+          templateConfig: { mode: 'generated', itemCount: 10, titlePattern: 'Progress {n}' },
+        },
+        {
+          key: 'exceptions',
+          name: 'Exceptions',
+          kind: 'exception',
+          chainBehavior: 'independent',
+          templateConfig: { mode: 'manual' },
+        },
       ],
     })
 
-    const dayToShift = calendar.days.find(
-      (day) => day.groupingKey === 'abeka' && day.groupingSequence === 3
+    const itemToShift = calendar.scheduledItems.find(
+      (item) => item.layerKey === 'reference' && item.sequenceIndex === 3
     )
-    expect(dayToShift).toBeDefined()
+    expect(itemToShift).toBeDefined()
 
-    const originalDate = new Date(dayToShift!.date).getTime()
+    const referenceBefore = calendar.scheduledItems.find(
+      (item) => item.layerKey === 'reference' && item.sequenceIndex === 3
+    )!
+    const progressBefore = calendar.scheduledItems.find(
+      (item) => item.layerKey === 'progress-a' && item.sequenceIndex === 3
+    )!
 
-    const updated = await shiftCalendarDays(calendar.id, {
-      dayId: dayToShift!.id,
-      shiftByDays: 2,
+    const shiftBy = 2
+    const updated = await shiftScheduledItems(calendar.id, {
+      scheduledItemId: itemToShift!.id,
+      shiftByDays: shiftBy,
     })
 
     expect(updated).not.toBeNull()
@@ -71,75 +91,74 @@ describe('calendarService.shiftCalendarDays', () => {
     const refreshed = await getCalendarById(calendar.id)
     expect(refreshed).not.toBeNull()
 
-    const shiftedAbekaDay = refreshed!.days.find(
-      (day: CalendarDTO['days'][number]) => day.groupingKey === 'abeka' && day.groupingSequence === 3
+    const shiftedReference = refreshed!.scheduledItems.find(
+      (item: CalendarDTO['scheduledItems'][number]) =>
+        item.layerKey === 'reference' && item.sequenceIndex === 3
     )
-    expect(shiftedAbekaDay).toBeDefined()
-    expect(new Date(shiftedAbekaDay!.date).getTime()).toBe(
-      originalDate + 1000 * 60 * 60 * 24 * 2
-    )
-
-    const shiftedStudentDay = refreshed!.days.find(
-      (day: CalendarDTO['days'][number]) => day.groupingKey === 'student-a' && day.groupingSequence === 3
-    )
-    expect(shiftedStudentDay).toBeDefined()
-    expect(new Date(shiftedStudentDay!.date).getTime()).toBe(
-      new Date(calendar.days.find((day) => day.id === shiftedStudentDay!.id)!.date).getTime() +
-        1000 * 60 * 60 * 24 * 2
+    expect(shiftedReference).toBeDefined()
+    const originalDate = new Date(referenceBefore.date).getTime()
+    expect(new Date(shiftedReference!.date).getTime()).toBe(
+      originalDate + 1000 * 60 * 60 * 24 * shiftBy
     )
 
-    const holidayDay = refreshed!.days.find(
-      (day: CalendarDTO['days'][number]) => day.groupingKey === 'holidays' && day.groupingSequence === 3
+    const shiftedProgress = refreshed!.scheduledItems.find(
+      (item: CalendarDTO['scheduledItems'][number]) =>
+        item.layerKey === 'progress-a' && item.sequenceIndex === 3
     )
-    if (holidayDay) {
-      const originalHoliday = calendar.days.find(
-        (day) => day.id === holidayDay.id
-      )
-      expect(originalHoliday).toBeDefined()
-      expect(new Date(holidayDay.date).getTime()).toBe(
-        new Date(originalHoliday!.date).getTime()
-      )
-    }
+    expect(shiftedProgress).toBeDefined()
+    expect(new Date(shiftedProgress!.date).getTime()).toBeGreaterThan(
+      new Date(progressBefore.date).getTime()
+    )
   })
 
-  it('limits shifts to explicit grouping keys', async () => {
+  it('limits shifts to explicit layer keys', async () => {
     const calendar = await createCalendar({
       name: 'Partial Shift',
-      source: 'custom',
       startDate: new Date('2025-08-04').toISOString(),
-      totalDays: 5,
       includeWeekends: false,
-      includeHolidays: false,
-      groupings: [
-        { key: 'abeka', name: 'Abeka', autoShift: true },
-        { key: 'student-b', name: 'Student B', autoShift: true },
+      includeExceptions: false,
+      layers: [
+        {
+          key: 'reference',
+          name: 'Reference',
+          chainBehavior: 'linked',
+          templateConfig: { mode: 'generated', itemCount: 5, titlePattern: 'Ref {n}' },
+        },
+        {
+          key: 'progress-b',
+          name: 'Progress B',
+          chainBehavior: 'linked',
+          templateConfig: { mode: 'generated', itemCount: 5, titlePattern: 'Progress {n}' },
+        },
       ],
     })
 
-    const dayToShift = calendar.days.find(
-      (day: CalendarDTO['days'][number]) => day.groupingKey === 'abeka' && day.groupingSequence === 2
+    const itemToShift = calendar.scheduledItems.find(
+      (item) => item.layerKey === 'reference' && item.sequenceIndex === 2
     )
-    expect(dayToShift).toBeDefined()
+    expect(itemToShift).toBeDefined()
 
-    const studentDayBefore = calendar.days.find(
-      (day: CalendarDTO['days'][number]) => day.groupingKey === 'student-b' && day.groupingSequence === 2
+    const progressBefore = calendar.scheduledItems.find(
+      (item) => item.layerKey === 'progress-b' && item.sequenceIndex === 2
     )
+    expect(progressBefore).toBeDefined()
 
-    await shiftCalendarDays(calendar.id, {
-      dayId: dayToShift!.id,
+    await shiftScheduledItems(calendar.id, {
+      scheduledItemId: itemToShift!.id,
       shiftByDays: 1,
-      groupingKeys: ['abeka'],
+      layerKeys: ['reference'],
     })
 
     const refreshed = await getCalendarById(calendar.id)
     expect(refreshed).not.toBeNull()
 
-    const updatedStudentDay = refreshed!.days.find(
-      (day: CalendarDTO['days'][number]) => day.groupingKey === 'student-b' && day.groupingSequence === 2
+    const updatedProgress = refreshed!.scheduledItems.find(
+      (item: CalendarDTO['scheduledItems'][number]) =>
+        item.layerKey === 'progress-b' && item.sequenceIndex === 2
     )
-    expect(updatedStudentDay).toBeDefined()
-    expect(new Date(updatedStudentDay!.date).toISOString()).toBe(
-      new Date(studentDayBefore!.date).toISOString()
+    expect(updatedProgress).toBeDefined()
+    expect(new Date(updatedProgress!.date).toISOString()).toBe(
+      new Date(progressBefore!.date).toISOString()
     )
   })
 })

@@ -3,7 +3,7 @@ import type {
   Calendar,
   CalendarSummary,
   CreateCalendarRequest,
-  ShiftCalendarDaysRequest,
+  ShiftScheduledItemsRequest,
   UpdateCalendarRequest,
 } from '../types/calendar'
 
@@ -26,9 +26,9 @@ export async function createCalendar(
   })
 }
 
-export async function shiftCalendarDays(
+export async function shiftScheduledItems(
   calendarId: string,
-  payload: ShiftCalendarDaysRequest
+  payload: ShiftScheduledItemsRequest
 ): Promise<Calendar> {
   return apiFetch<Calendar>(`/calendars/${calendarId}/shift`, {
     method: 'POST',

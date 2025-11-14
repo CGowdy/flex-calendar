@@ -3,40 +3,40 @@ import { computed, reactive, watch } from 'vue'
 
 import type {
   Calendar,
-  CalendarDay,
-  ShiftCalendarDaysRequest,
+  ScheduledItem,
+  ShiftScheduledItemsRequest,
 } from '@/features/calendar/types/calendar'
 
 const props = defineProps<{
   open: boolean
   calendar: Calendar | null
-  day: CalendarDay | null
-  autoShiftGroupingKeys: string[]
+  day: ScheduledItem | null
+  linkedLayerKeys: string[]
   busy?: boolean
 }>()
 
 const emit = defineEmits<{
   (event: 'close'): void
-  (event: 'shift', payload: ShiftCalendarDaysRequest): void
+  (event: 'shift', payload: ShiftScheduledItemsRequest): void
 }>()
 
 const state = reactive({
   shiftByDays: 1,
-  groupingSelections: [] as string[],
+  layerSelections: [] as string[],
 })
 
-const groupingOptions = computed(() => props.calendar?.groupings ?? [])
+const layerOptions = computed(() => props.calendar?.layers ?? [])
 
 watch(
   () => props.day,
   (day) => {
     if (!day) {
-      state.groupingSelections = []
+      state.layerSelections = []
       return
     }
-    const defaults = new Set(props.autoShiftGroupingKeys)
-    defaults.add(day.groupingKey)
-    state.groupingSelections = Array.from(defaults)
+    const defaults = new Set(props.linkedLayerKeys)
+    defaults.add(day.layerKey)
+    state.layerSelections = Array.from(defaults)
     state.shiftByDays = 1
   },
   { immediate: true }
@@ -55,18 +55,18 @@ function formatDate(iso: string | undefined): string {
 function handleShift(sign: number) {
   if (!props.day) return
   emit('shift', {
-    dayId: props.day.id,
+    scheduledItemId: props.day.id,
     shiftByDays: sign,
-    groupingKeys: state.groupingSelections,
+    layerKeys: state.layerSelections,
   })
 }
 
 function handleSubmit() {
   if (!props.day || state.shiftByDays === 0 || props.busy) return
   emit('shift', {
-    dayId: props.day.id,
+    scheduledItemId: props.day.id,
     shiftByDays: state.shiftByDays,
-    groupingKeys: state.groupingSelections,
+    layerKeys: state.layerSelections,
   })
 }
 </script>
@@ -84,8 +84,8 @@ function handleSubmit() {
           <div>
             <h2>{{ day!.label }}</h2>
             <p class="drawer__meta">
-              {{ formatDate(day!.date) }} · Track:
-              {{ calendar?.groupings.find((group) => group.key === day!.groupingKey)?.name ?? day!.groupingKey }}
+              {{ formatDate(day!.date) }} · Layer:
+              {{ calendar?.layers.find((layer) => layer.key === day!.layerKey)?.name ?? day!.layerKey }}
             </p>
           </div>
           <button
@@ -120,7 +120,7 @@ function handleSubmit() {
           <article class="shift-card">
             <header class="shift-card__header">
               <h3>Reschedule lessons</h3>
-              <p>Select the tracks that should adjust with this change.</p>
+            <p>Select the layers that should adjust with this change.</p>
             </header>
 
             <div class="quick-actions">
@@ -155,20 +155,20 @@ function handleSubmit() {
               </label>
 
               <fieldset class="grouping-fieldset">
-                <legend>Grouping adjustments</legend>
+                <legend>Layer adjustments</legend>
                 <ul>
                   <li
-                    v-for="group in groupingOptions"
-                    :key="group.key"
+                    v-for="layer in layerOptions"
+                    :key="layer.key"
                   >
                     <label class="toggle">
                       <input
                         type="checkbox"
-                        :value="group.key"
-                        v-model="state.groupingSelections"
+                        :value="layer.key"
+                        v-model="state.layerSelections"
                         :disabled="busy"
                       />
-                      <span>{{ group.name }}</span>
+                      <span>{{ layer.name }}</span>
                     </label>
                   </li>
                 </ul>

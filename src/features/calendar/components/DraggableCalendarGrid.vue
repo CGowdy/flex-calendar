@@ -1,36 +1,45 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 
-import type { Calendar, CalendarDay } from '@/features/calendar/types/calendar'
+import type { Calendar, ScheduledItem } from '@/features/calendar/types/calendar'
 
 const props = defineProps<{
   calendar: Calendar
   selectedDayId: string | null
+  visibleLayerKeys?: string[]
   disabled?: boolean
 }>()
 
 const emit = defineEmits<{
-  (event: 'select-day', dayId: string): void
+  (event: 'select-day', scheduledItemId: string): void
   (
     event: 'shift-day',
-    payload: { dayId: string; shiftByDays: number; groupingKeys?: string[] }
+    payload: {
+      scheduledItemId: string
+      shiftByDays: number
+      layerKeys?: string[]
+    }
   ): void
 }>()
 
-const groupedDays = computed(() => {
-  const groups = new Map<string, CalendarDay[]>()
-  for (const day of props.calendar.days) {
-    if (!groups.has(day.groupingKey)) {
-      groups.set(day.groupingKey, [])
+const groupedItems = computed(() => {
+  const allow = props.visibleLayerKeys
+    ? new Set(props.visibleLayerKeys)
+    : null
+  const groups = new Map<string, ScheduledItem[]>()
+  for (const item of props.calendar.scheduledItems) {
+    if (allow && !allow.has(item.layerKey)) continue
+    if (!groups.has(item.layerKey)) {
+      groups.set(item.layerKey, [])
     }
-    groups.get(day.groupingKey)!.push(day)
+    groups.get(item.layerKey)!.push(item)
   }
 
-  for (const [key, days] of groups.entries()) {
-    days.sort(
-      (a, b) => a.groupingSequence - b.groupingSequence
+  for (const [key, items] of groups.entries()) {
+    items.sort(
+      (a, b) => (a.sequenceIndex ?? a.groupingSequence) - (b.sequenceIndex ?? b.groupingSequence)
     )
-    groups.set(key, days)
+    groups.set(key, items)
   }
 
   return groups
@@ -43,11 +52,11 @@ function formatDate(iso: string): string {
   }).format(new Date(iso))
 }
 
-function handleShift(day: CalendarDay, delta: number) {
+function handleShift(item: ScheduledItem, delta: number) {
   emit('shift-day', {
-    dayId: day.id,
+    scheduledItemId: item.id,
     shiftByDays: delta,
-    groupingKeys: [day.groupingKey],
+    layerKeys: [item.layerKey],
   })
 }
 </script>
@@ -55,39 +64,39 @@ function handleShift(day: CalendarDay, delta: number) {
 <template>
   <div class="grid">
     <section
-      v-for="[groupingKey, days] in groupedDays"
-      :key="groupingKey"
+      v-for="[layerKey, items] in groupedItems"
+      :key="layerKey"
       class="grid-column"
     >
       <header class="column-header">
-        <h3>{{ calendar.groupings.find((group) => group.key === groupingKey)?.name ?? groupingKey }}</h3>
+        <h3>{{ calendar.layers.find((layer) => layer.key === layerKey)?.name ?? layerKey }}</h3>
         <span class="column-subtitle">
-          {{ days.length }} day{{ days.length === 1 ? '' : 's' }}
+          {{ items.length }} item{{ items.length === 1 ? '' : 's' }}
         </span>
       </header>
 
       <ul class="day-list">
         <li
-          v-for="day in days"
-          :key="day.id"
+          v-for="item in items"
+          :key="item.id"
         >
           <article
             class="day-card"
-            :class="{ active: selectedDayId === day.id }"
+            :class="{ active: selectedDayId === item.id }"
           >
             <button
               type="button"
               class="day-card__main"
               :disabled="disabled"
-              @click="emit('select-day', day.id)"
+              @click="emit('select-day', item.id)"
             >
               <div class="day-title">
-                <span class="day-label">{{ day.label }}</span>
-                <span class="day-date">{{ formatDate(day.date) }}</span>
+                <span class="day-label">{{ item.label }}</span>
+                <span class="day-date">{{ formatDate(item.date) }}</span>
               </div>
 
-              <p v-if="day.events.length > 0" class="day-event">
-                {{ day.events[0]?.title }}
+              <p v-if="item.events.length > 0" class="day-event">
+                {{ item.events[0]?.title }}
               </p>
             </button>
 
@@ -96,7 +105,7 @@ function handleShift(day: CalendarDay, delta: number) {
                 type="button"
                 class="action-button"
                 :disabled="disabled"
-                @click="handleShift(day, -1)"
+                @click="handleShift(item, -1)"
                 aria-label="Move lesson earlier by one day"
               >
                 −1 day
@@ -105,7 +114,7 @@ function handleShift(day: CalendarDay, delta: number) {
                 type="button"
                 class="action-button"
                 :disabled="disabled"
-                @click="handleShift(day, 1)"
+                @click="handleShift(item, 1)"
                 aria-label="Move lesson later by one day"
               >
                 +1 day

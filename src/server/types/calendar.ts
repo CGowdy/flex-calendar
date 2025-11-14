@@ -1,3 +1,6 @@
+export type ChainBehavior = 'linked' | 'independent'
+export type LayerKind = 'standard' | 'exception'
+
 export interface CalendarEventDTO {
   id: string
   title: string
@@ -6,38 +9,38 @@ export interface CalendarEventDTO {
   metadata: Record<string, unknown>
 }
 
-export interface CalendarDayDTO {
+export interface ScheduledItemDTO {
   id: string
   date: Date
-  groupingKey: string
-  groupingSequence: number
+  layerKey: string
+  sequenceIndex: number
   label: string
   notes: string
   events: CalendarEventDTO[]
 }
 
-export interface CalendarGroupingDTO {
+export interface CalendarLayerDTO {
   key: string
   name: string
   color: string
   description: string
-  autoShift: boolean
+  chainBehavior: ChainBehavior
+  kind: LayerKind
 }
 
 export interface CalendarDTO {
   id: string
   name: string
-  source: 'abeka' | 'custom'
+  presetKey?: string
   startDate: Date
-  totalDays: number
   includeWeekends: boolean
-  includeHolidays: boolean
-  groupings: CalendarGroupingDTO[]
-  days: CalendarDayDTO[]
+  includeExceptions: boolean
+  layers: CalendarLayerDTO[]
+  scheduledItems: ScheduledItemDTO[]
 }
 
 export type CalendarSummaryDTO = Pick<
   CalendarDTO,
-  'id' | 'name' | 'startDate' | 'totalDays' | 'groupings'
+  'id' | 'name' | 'startDate' | 'layers'
 >
 

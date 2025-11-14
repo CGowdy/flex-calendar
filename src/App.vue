@@ -6,18 +6,10 @@ import { RouterLink, RouterView } from 'vue-router'
   <div class="app-shell">
     <header class="app-header">
       <RouterLink to="/" class="brand">
-        <span class="brand-mark">My Abeka Calendar</span>
+        <span class="brand-mark">Flex Calendar</span>
       </RouterLink>
 
       <nav class="header-nav">
-        <a
-          class="nav-link"
-          href="https://www.abeka.com/Resources/Articles/ABekaAcademy/"
-          target="_blank"
-          rel="noreferrer"
-        >
-          Abeka Resources
-        </a>
         <a
           class="nav-link"
           href="https://github.com"

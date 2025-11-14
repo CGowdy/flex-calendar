@@ -9,7 +9,7 @@ Generated: 2025-11-14
 
 ## Executive Summary
 
-Foundational infrastructure remains strong and the latest merge delivered the long-awaited **smart chain-move reflow** (skips weekends/holidays) across the client composable, server service, and shared date utilities. With that in place, the product is now roughly **55-60% complete** toward the MVP: core generation, chaining, and UI scaffolding work, yet holiday CRUD, Abeka delta tracking, and catch-up tooling are still outstanding.
+Foundational infrastructure remains strong and the latest merge delivered the long-awaited **smart chain-move reflow** (skips weekends/holidays) across the client composable, server service, and shared date utilities. With that in place, the product is now roughly **55-60% complete** toward the MVP: core generation, chaining, and UI scaffolding work, yet exception CRUD, reference-layer delta tracking, and catch-up tooling are still outstanding.
 
 ## ✅ Fully Implemented
 
@@ -24,10 +24,10 @@ Foundational infrastructure remains strong and the latest merge delivered the lo
 
 ### Basic Calendar Management
 - [x] **Setup Wizard UI** - Basic form exists
-- [x] **Calendar creation** - Can create calendars with groupings
+- [x] **Calendar creation** - Can create calendars with layers
 - [x] **Multiple calendar support** - Can create and switch between calendars
-- [x] **Grouping system** - Supports multiple groupings (Abeka, Student A/B, Holidays)
-- [x] **Calendar-level chaining toggle** - `autoShift` property on groupings (maps to `isChained` concept)
+- [x] **Layer system** - Supports multiple layers (reference, progress, exceptions)
+- [x] **Calendar-level chaining toggle** - `chainBehavior` per layer governs whether items are linked
 - [x] **Patterned labeling** - Supports `{n}` token in `titlePattern` for event titles
 - [x] **Basic day generation** - Generates days with sequential numbering
 
@@ -49,7 +49,7 @@ Foundational infrastructure remains strong and the latest merge delivered the lo
 - ✅ Start date input
 - ✅ Total days input (default 170)
 - ✅ Weekday selection (`includeWeekends` toggle)
-- ✅ Multiple grouping selection
+- ✅ Multiple layer selection
 - ✅ Label pattern support (`titlePattern` with `{n}` token)
 
 **What's missing:**
@@ -67,7 +67,7 @@ Foundational infrastructure remains strong and the latest merge delivered the lo
 **What works:**
 - ✅ **Drag-and-drop** and **button shifting** stay stable in `MonthCalendar.vue` and `DraggableCalendarGrid.vue`.
 - ✅ **Smart reflow algorithm** now respects the `includeWeekends` toggle and holiday exclusions using `generateValidSchoolDates()`.
-- ✅ **Grouping-aware reflow** still scopes to `autoShift` calendars or user-specified grouping keys.
+- ✅ **Layer-aware reflow** still scopes to linked calendars or user-specified layer keys.
 - ✅ **Unit tests** (`useScheduleAdjuster.spec.ts`) cover weekend/holiday skipping to guard regressions.
 
 **What's missing:**
@@ -95,8 +95,8 @@ Foundational infrastructure remains strong and the latest merge delivered the lo
 **Status: ~20% complete**
 
 **What works:**
-- ✅ Holidays grouping exists (`autoShift: false`)
-- ✅ Date utilities + reflow logic will skip any `holidays` grouping entries if/when they exist
+- ✅ Exception layer exists (`chainBehavior: 'independent'`)
+- ✅ Date utilities + reflow logic will skip any exception layer entries if/when they exist
 
 **What's missing:**
 - ❌ **Holiday management UI** - No way to add/remove holidays
@@ -109,18 +109,18 @@ Foundational infrastructure remains strong and the latest merge delivered the lo
 - Missing: Holiday CRUD operations
 - Missing: Holiday exclusion logic in `nextSchoolDate()` and `generateDaysForGrouping()`
 
-### 5. Per-student calendars (Abeka, Holidays, Student A/B/C)
+### 5. Layered calendars (reference, progress, exceptions)
 **Status: ~90% complete**
 
 **What works:**
-- ✅ Multiple groupings per calendar
-- ✅ Independent grouping management
-- ✅ Grouping visibility toggles
-- ✅ Color customization per grouping
+- ✅ Multiple layers per calendar
+- ✅ Independent layer management
+- ✅ Layer visibility toggles
+- ✅ Color customization per layer
 
 **What's missing:**
-- ❌ **Abeka reference tracking** - No way to compare student calendars to Abeka reference
-- ❌ **Delta calculation** - No "Day 11 vs Abeka Day 52 (-41)" functionality
+- ❌ **Reference layer tracking** - No way to compare progress layers to the reference layer
+- ❌ **Delta calculation** - No "Item 11 vs Reference Item 52 (-41)" functionality
 
 ## ❌ Not Implemented
 
@@ -142,7 +142,7 @@ Foundational infrastructure remains strong and the latest merge delivered the lo
 - ❌ Reflow logic when sick days are marked
 - ❌ Distinction between holidays and sick days
 
-### 8. Timeline/Dashboard with Abeka delta and projections
+### 8. Timeline/Dashboard with reference delta and projections
 **Status: ~30% complete**
 
 **What works:**
@@ -151,13 +151,13 @@ Foundational infrastructure remains strong and the latest merge delivered the lo
 - ✅ Upcoming lessons list
 
 **What's missing:**
-- ❌ **Abeka reference comparison** - No delta calculation ("You are on Day 11; Abeka is at Day 52 (-41)")
+- ❌ **Reference comparison** - No delta calculation ("You are on Item 11; Reference is at Item 52 (-41)")
 - ❌ **Current day detection** - No automatic "today" vs schedule comparison
 - ❌ **Forecast display** - No catch-up scenario projections
 - ❌ **Milestones** - No milestone tracking
 
 **Code locations:**
-- `src/features/calendar/components/CalendarTimeline.vue` - Basic stats exist but no Abeka comparison
+- `src/features/calendar/components/CalendarTimeline.vue` - Basic stats exist but no reference comparison
 
 ### 9. Fractional days via split (1 of 2, 2 of 2)
 **Status: 0% complete**
@@ -180,20 +180,20 @@ Foundational infrastructure remains strong and the latest merge delivered the lo
 ### 1. No Holiday Management/Data Source
 
 **Current State:**
-- Holidays grouping can exist in data, and the new reflow utilities will respect any `groupingKey === 'holidays'` entries.
+- Exception layers can exist in data, and the new reflow utilities will respect any `layerKey === 'exceptions'` entries.
 - There is still **no UI or API flow** to add/remove holidays, import ICS, or toggle exclusions post-setup.
 - Setup Wizard does not collect holidays, so most calendars will never populate the exclusion set.
 
 **Impact:** High — smart reflow depends on holiday data, but users cannot provide it yet, blocking MVP parity with the spec.
 
-### 2. No Abeka Reference Tracking
+### 2. No Reference Layer Tracking
 
 **Current State:**
-- Abeka grouping is stored like any other student grouping.
-- Dashboard lacks delta calculations, "today vs Abeka" messaging, and milestones.
-- No composable/service to compare the current date to Abeka's pacing.
+- Reference layer data is stored like any other progress layer.
+- Dashboard lacks delta calculations, "today vs reference layer" messaging, and milestones.
+- No composable/service to compare the current date to the reference layer's pacing.
 
-**Impact:** High — differentiating Abeka vs student calendars is central to the product promise and is part of the MVP milestone.
+**Impact:** High — differentiating reference vs progress layers is central to the product promise and is part of the MVP milestone.
 
 ### 3. Missing API Endpoints
 
@@ -220,19 +220,19 @@ Foundational infrastructure remains strong and the latest merge delivered the lo
    - Add a `HolidayManager` component on the dashboard so admins can insert/remove exclusions later.
 2. **Persist holidays through the API**
    - Add `PATCH /api/calendars/:id/holidays` for CRUD + automatic reflow.
-   - Store holidays either as dedicated subdocuments or reuse the existing `holidays` grouping (but enforce `autoShift=false`).
+   - Store holidays either as dedicated subdocuments or reuse the existing `exceptions` layer (but enforce `chainBehavior: 'independent'`).
 3. **Trigger reflow + notify UI**
    - Reuse the new `generateValidSchoolDates()` helper after any holiday edit.
 
 **Files:** `SetupWizard.vue`, `CalendarDashboard.vue` (new subcomponent), `src/server/routes/calendars.ts`, `calendarService.ts`, `calendarModel.ts`, `dateUtils.ts`.
 
-### Priority 2: Abeka Reference Tracking & Timeline (High)
+### Priority 2: Reference Layer Tracking & Timeline (High)
 
 1. **Comparison logic**
-   - Add a composable/service (`useAbekaComparison` or Pinia module) that maps "today" to current Abeka + Student day indexes.
+   - Add a composable/service (`useReferenceLayerComparison` or Pinia module) that maps "today" to current reference + progress layer indexes.
    - Persist metadata (e.g., `referenceCalendarId`) if needed for clarity.
 2. **Timeline/Dashboard UI**
-   - Surface "You are on Day X / Abeka Day Y (ΔZ)" with status chips.
+   - Surface "You are on Item X / Reference Item Y (ΔZ)" with status chips.
    - Highlight projected end date and parity date (placeholder calculations until catch-up planner ships).
 
 **Files:** `CalendarTimeline.vue`, `CalendarDashboard.vue`, new composable in `src/features/calendar/composables/`.
@@ -265,9 +265,9 @@ Foundational infrastructure remains strong and the latest merge delivered the lo
 - ✅ **New** composable tests for `useScheduleAdjuster` cover weekend/holiday skipping
 
 **Missing tests:**
-- ❌ Server-side reflow regression tests (date collisions, multi-grouping scenarios)
+- ❌ Server-side reflow regression tests (date collisions, multi-layer scenarios)
 - ❌ Holiday exclusion logic end-to-end (blocked by missing UI/API)
-- ❌ Abeka comparison calculations
+- ❌ Reference layer comparison calculations
 - ❌ Catch-up forecast engine
 - ❌ E2E tests for critical flows
 
@@ -277,12 +277,12 @@ Foundational infrastructure remains strong and the latest merge delivered the lo
 - Clean separation of concerns (UI, store, API, services)
 - Type-safe throughout (TypeScript + Zod)
 - Good component structure
-- Flexible grouping system
+- Flexible layer system
 
 ### Areas for Improvement
 - Reflow logic needs to be centralized (currently duplicated)
-- Holiday concept needs to be first-class (not just a grouping)
-- Abeka reference needs dedicated abstraction
+- Holiday concept needs to be first-class (not just a layer)
+- Reference layer needs dedicated abstraction
 - Date utilities need to be more comprehensive
 
 ## Conclusion
@@ -290,10 +290,10 @@ Foundational infrastructure remains strong and the latest merge delivered the lo
 The codebase now satisfies the spec-level chaining behavior but remains blocked on data/UX work that surfaces that capability. The most urgent issues are:
 
 1. **Holiday management + data entry** — Without it, smart reflow cannot exercise weekend/holiday skipping in real scenarios.
-2. **Abeka reference tracking & dashboard deltas** — Users still lack visibility into where they stand.
+2. **Reference layer tracking & dashboard deltas** — Users still lack visibility into where they stand.
 3. **Setup wizard + Timeline polish** — Need better regeneration tooling and entry points before investing in catch-up or exports.
 
-**Recommendation:** Tackle Holiday CRUD + Abeka comparison immediately, then iterate on catch-up planner and sick days once the MVP loop (Plan → Adjust → Compare) feels solid.
+**Recommendation:** Tackle exception CRUD + reference comparisons immediately, then iterate on catch-up planner and sick days once the MVP loop (Plan → Adjust → Compare) feels solid.
 
 
 

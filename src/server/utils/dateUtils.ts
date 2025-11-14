@@ -28,15 +28,19 @@ export function isHoliday(
 }
 
 /**
- * Gets the set of holiday dates from calendar days with groupingKey='holidays'.
+ * Gets the set of holiday dates from scheduled items belonging to exception layers.
  */
 export function getHolidayDates(
-  days: Array<{ date: Date | string; groupingKey: string }>
+  items: Array<{ date: Date | string; layerKey: string }>
 ): Set<string> {
   const holidaySet = new Set<string>()
-  for (const day of days) {
-    if (day.groupingKey === 'holidays') {
-      const date = typeof day.date === 'string' ? new Date(day.date) : day.date
+  for (const item of items) {
+    if (
+      item.layerKey === 'holidays' ||
+      item.layerKey === 'exceptions'
+    ) {
+      const date =
+        typeof item.date === 'string' ? new Date(item.date) : item.date
       holidaySet.add(normalizeDate(date))
     }
   }
