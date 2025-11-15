@@ -1,15 +1,20 @@
 # Flex Calendar - Implementation Status Report
 
-Generated: 2025-11-14
+Generated: 2025-11-15
 
 > **ADR-lite (2025-11-14)**
 > Context: Smart reflow + holiday-aware utilities landed upstream.
 > Decision: Refresh status to capture the new chaining behavior and reprioritize roadmap.
 > Consequences: Progress now reflects ~60% MVP completion with Holiday CRUD as the next gating item.
+>
+> **ADR-lite (2025-11-15)**
+> Context: Front-end calendar components were a mix of bespoke CSS blocks and utility classes, making dark mode, theming, and future contributions inconsistent.
+> Decision: Migrate the entire `src/features/calendar/components` folder to Tailwind-only utility styling, codify the patterns in `docs/HowTo.md`, and drop the old scoped styles.
+> Consequences: UI work now has a consistent token vocabulary (slate/brand palette, gradient CTAs, card shells) and hot reload for style tweaks no longer requires digging through style blocks.
 
 ## Executive Summary
 
-Foundational infrastructure remains strong and the latest merge delivered the long-awaited **smart chain-move reflow** (skips weekends/holidays) across the client composable, server service, and shared date utilities. With that in place, the product is now roughly **55-60% complete** toward the MVP: core generation, chaining, and UI scaffolding work, yet exception CRUD, reference-layer delta tracking, and catch-up tooling are still outstanding.
+Foundational infrastructure remains strong and the latest merge delivered the long-awaited **smart chain-move reflow** (skips weekends/holidays) across the client composable, server service, and shared date utilities. On 2025-11-15 we also unified the entire calendar feature UI on Tailwind utility classes, eliminating bespoke CSS and documenting the patterns in `HowTo.md`. With those pieces in place, the product is now roughly **55-60% complete** toward the MVP: core generation, chaining, and UI scaffolding work, yet exception CRUD, reference-layer delta tracking, and catch-up tooling are still outstanding.
 
 ## ✅ Fully Implemented
 
@@ -21,6 +26,7 @@ Foundational infrastructure remains strong and the latest merge delivered the lo
 - [x] **Vue 3 + TypeScript** frontend with Composition API
 - [x] **Pinia store** for state management
 - [x] **Zod validation** schemas
+- [x] **Tailwind-first styling** for calendar feature components (cards, drawers, calendars, wizards)
 
 ### Basic Calendar Management
 - [x] **Setup Wizard UI** - Basic form exists

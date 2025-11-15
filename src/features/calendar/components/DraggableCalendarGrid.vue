@@ -62,48 +62,53 @@ function handleShift(item: ScheduledItem, delta: number) {
 </script>
 
 <template>
-  <div class="grid">
+  <div class="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
     <section
       v-for="[layerKey, items] in groupedItems"
       :key="layerKey"
-      class="grid-column"
+      class="flex max-h-[70vh] flex-col gap-3 overflow-y-auto rounded-2xl border border-slate-200 bg-white/95 p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900"
     >
-      <header class="column-header">
-        <h3>{{ calendar.layers.find((layer) => layer.key === layerKey)?.name ?? layerKey }}</h3>
-        <span class="column-subtitle">
+      <header>
+        <h3 class="text-base font-semibold text-slate-900 dark:text-white">
+          {{ calendar.layers.find((layer) => layer.key === layerKey)?.name ?? layerKey }}
+        </h3>
+        <span class="text-xs text-slate-500 dark:text-slate-400">
           {{ items.length }} item{{ items.length === 1 ? '' : 's' }}
         </span>
       </header>
 
-      <ul class="day-list">
+      <ul class="space-y-3">
         <li
           v-for="item in items"
           :key="item.id"
         >
           <article
-            class="day-card"
-            :class="{ active: selectedDayId === item.id }"
+            class="flex flex-col gap-3 rounded-xl border border-transparent bg-slate-50/80 p-3 transition hover:border-slate-200 dark:bg-slate-800/50"
+            :class="{
+              'border-blue-500 bg-blue-50 text-blue-900 dark:border-blue-400 dark:bg-blue-500/20 dark:text-blue-50': selectedDayId === item.id
+            }"
           >
             <button
               type="button"
-              class="day-card__main"
+              class="flex flex-col items-start gap-2 text-left"
+              :class="disabled ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'"
               :disabled="disabled"
               @click="emit('select-day', item.id)"
             >
-              <div class="day-title">
-                <span class="day-label">{{ item.title }}</span>
-                <span class="day-date">{{ formatDate(item.date) }}</span>
+              <div class="flex w-full items-center justify-between gap-2">
+                <span class="text-sm font-semibold text-slate-900 dark:text-white">{{ item.title }}</span>
+                <span class="text-xs text-slate-500 dark:text-slate-400">{{ formatDate(item.date) }}</span>
               </div>
 
-              <p v-if="item.description" class="day-event">
+              <p v-if="item.description" class="text-sm text-slate-600 dark:text-slate-300">
                 {{ item.description }}
               </p>
             </button>
 
-            <div class="day-actions">
+            <div class="flex gap-2">
               <button
                 type="button"
-                class="action-button"
+                class="flex-1 rounded-lg border border-blue-200 bg-blue-50 px-2 py-1 text-xs font-semibold text-blue-700 transition hover:bg-blue-100 disabled:cursor-not-allowed disabled:opacity-50 dark:border-blue-400/60 dark:bg-blue-500/10 dark:text-blue-100"
                 :disabled="disabled"
                 @click="handleShift(item, -1)"
                 aria-label="Move lesson earlier by one day"
@@ -112,7 +117,7 @@ function handleShift(item: ScheduledItem, delta: number) {
               </button>
               <button
                 type="button"
-                class="action-button"
+                class="flex-1 rounded-lg border border-blue-200 bg-blue-50 px-2 py-1 text-xs font-semibold text-blue-700 transition hover:bg-blue-100 disabled:cursor-not-allowed disabled:opacity-50 dark:border-blue-400/60 dark:bg-blue-500/10 dark:text-blue-100"
                 :disabled="disabled"
                 @click="handleShift(item, 1)"
                 aria-label="Move lesson later by one day"
@@ -126,131 +131,4 @@ function handleShift(item: ScheduledItem, delta: number) {
     </section>
   </div>
 </template>
-
-<style scoped>
-.grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-  gap: 1rem;
-}
-
-.grid-column {
-  display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
-  background: var(--color-background-soft);
-  border: 1px solid var(--color-border);
-  border-radius: 1rem;
-  padding: 1rem;
-  max-height: 70vh;
-  overflow-y: auto;
-}
-
-.column-header h3 {
-  margin-bottom: 0.25rem;
-}
-
-.column-subtitle {
-  font-size: 0.8rem;
-  color: var(--color-text);
-  opacity: 0.75;
-}
-
-.day-list {
-  list-style: none;
-  padding: 0;
-  margin: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
-}
-
-.day-card {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-  border: 1px solid transparent;
-  border-radius: 0.9rem;
-  background: var(--color-background-mute);
-  padding: 0.65rem;
-  transition: border-color 0.2s ease, background-color 0.2s ease;
-}
-
-.day-card.active {
-  border-color: rgba(37, 99, 235, 0.5);
-  background: rgba(37, 99, 235, 0.15);
-}
-
-.day-card__main {
-  display: flex;
-  flex-direction: column;
-  gap: 0.4rem;
-  align-items: flex-start;
-  border: none;
-  background: transparent;
-  text-align: left;
-  cursor: pointer;
-}
-
-.day-card__main:disabled {
-  cursor: not-allowed;
-  opacity: 0.6;
-}
-
-.day-title {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  width: 100%;
-  gap: 0.75rem;
-}
-
-.day-label {
-  font-weight: 600;
-}
-
-.day-date {
-  font-size: 0.85rem;
-  color: var(--color-text);
-  opacity: 0.75;
-}
-
-.day-event {
-  font-size: 0.85rem;
-  color: var(--color-text);
-  opacity: 0.9;
-}
-
-.day-actions {
-  display: flex;
-  gap: 0.5rem;
-}
-
-.action-button {
-  flex: 1 1 auto;
-  border: 1px solid rgba(37, 99, 235, 0.4);
-  background: rgba(37, 99, 235, 0.08);
-  color: #1d4ed8;
-  padding: 0.35rem 0.5rem;
-  border-radius: 0.65rem;
-  cursor: pointer;
-  font-size: 0.8rem;
-  transition: background-color 0.2s ease;
-}
-
-.action-button:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.action-button:not(:disabled):hover {
-  background: rgba(37, 99, 235, 0.15);
-}
-
-@media (max-width: 768px) {
-  .grid {
-    grid-template-columns: 1fr;
-  }
-}
-</style>
 

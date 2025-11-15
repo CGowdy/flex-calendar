@@ -94,19 +94,26 @@ function handleSubmit() {
 </script>
 
 <template>
-  <form class="quick-add-card" @submit.prevent="handleSubmit">
-    <header class="quick-add-card__header">
-      <div>
-        <p class="quick-add-card__eyebrow">Add calendar</p>
-        <h2>Quick create</h2>
-        <p class="quick-add-card__hint">
+  <form
+    class="flex w-full flex-col gap-5 rounded-2xl border border-slate-200/80 bg-white/95 p-5 text-slate-900 shadow-elevated dark:border-slate-700/70 dark:bg-slate-900"
+    @submit.prevent="handleSubmit"
+  >
+    <header class="flex items-start justify-between gap-3">
+      <div class="space-y-1.5">
+        <p class="text-xs font-semibold uppercase tracking-[0.3em] text-slate-500 dark:text-slate-400">
+          Add calendar
+        </p>
+        <h2 class="text-lg font-semibold text-slate-900 dark:text-white">
+          Quick create
+        </h2>
+        <p class="text-sm text-slate-600 dark:text-slate-300">
           Start a calendar with a reference layer, a progress layer, and an exceptions lane. You can customize layers later as needed.
         </p>
       </div>
 
       <button
         type="button"
-        class="icon-button"
+        class="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-transparent text-slate-500 transition hover:border-slate-200 hover:bg-slate-100 dark:text-slate-300 dark:hover:border-slate-700 dark:hover:bg-slate-800/70 disabled:cursor-not-allowed disabled:opacity-60"
         :disabled="submitting"
         aria-label="Close quick add form"
         @click="emit('cancel')"
@@ -115,61 +122,66 @@ function handleSubmit() {
       </button>
     </header>
 
-    <div class="quick-add-grid">
-      <label class="field">
+    <div class="grid gap-4 sm:grid-cols-2 md:grid-cols-3">
+      <label class="flex flex-col gap-2 text-sm font-semibold text-slate-600 dark:text-slate-200">
         <span>Calendar name</span>
         <input
           v-model="form.name"
           type="text"
           placeholder="Content Pipeline 2025"
           :disabled="submitting"
+          class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-base text-slate-900 shadow-sm transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400"
         />
       </label>
 
-      <label class="field">
+      <label class="flex flex-col gap-2 text-sm font-semibold text-slate-600 dark:text-slate-200">
         <span>Start date</span>
         <input
           v-model="form.startDate"
           type="date"
           :disabled="submitting"
+          class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-base text-slate-900 shadow-sm transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
         />
       </label>
 
-      <label class="field">
+      <label class="flex flex-col gap-2 text-sm font-semibold text-slate-600 dark:text-slate-200">
         <span>Template items per layer</span>
         <input
           v-model.number="form.templateItemCount"
           type="number"
           min="1"
           :disabled="submitting"
+          class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-base text-slate-900 shadow-sm transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
         />
       </label>
     </div>
 
-    <div class="quick-add-toggles">
-      <label class="toggle">
+    <div class="flex flex-wrap gap-3 text-sm text-slate-600 dark:text-slate-300">
+      <label class="inline-flex items-center gap-2 rounded-full border border-slate-200 px-3 py-2 text-sm font-medium dark:border-slate-600">
         <input
           v-model="form.includeWeekends"
           type="checkbox"
           :disabled="submitting"
+          class="h-4 w-4 rounded border-slate-300 text-brand focus:ring-brand dark:border-slate-600"
         />
         <span>Allow weekends in generated layers</span>
       </label>
 
-      <label class="toggle">
+      <label class="inline-flex items-center gap-2 rounded-full border border-slate-200 px-3 py-2 text-sm font-medium dark:border-slate-600">
         <input
           v-model="form.includeExceptions"
           type="checkbox"
           :disabled="submitting"
+          class="h-4 w-4 rounded border-slate-300 text-brand focus:ring-brand dark:border-slate-600"
         />
         <span>Let exceptions move with shifts</span>
       </label>
     </div>
 
-    <footer class="quick-add-actions">
+    <footer class="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
       <button
         type="button"
-        class="secondary-button"
+        class="inline-flex w-full items-center justify-center rounded-xl border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800 sm:w-auto"
         :disabled="submitting"
         @click="emit('cancel')"
       >
@@ -177,7 +189,7 @@ function handleSubmit() {
       </button>
       <button
         type="submit"
-        class="primary-button"
+        class="inline-flex w-full items-center justify-center rounded-xl bg-gradient-to-r from-blue-600 to-indigo-500 px-4 py-2 text-sm font-semibold text-white shadow-lg transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
         :disabled="!isValid || submitting"
       >
         <span v-if="submitting">Saving…</span>
@@ -186,143 +198,4 @@ function handleSubmit() {
     </footer>
   </form>
 </template>
-
-<style scoped>
-.quick-add-card {
-  width: 100%;
-  border: 1px solid var(--color-border);
-  border-radius: 1rem;
-  padding: 1.25rem;
-  background: var(--color-background);
-  display: flex;
-  flex-direction: column;
-  gap: 1rem;
-  box-shadow: 0 20px 45px -30px rgba(15, 23, 42, 0.4);
-}
-
-.quick-add-card__header {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  gap: 1rem;
-}
-
-.quick-add-card__eyebrow {
-  font-size: 0.85rem;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: var(--color-text);
-  opacity: 0.7;
-  margin-bottom: 0.25rem;
-}
-
-.quick-add-card__hint {
-  color: var(--color-text);
-  opacity: 0.8;
-  max-width: 48ch;
-}
-
-.icon-button {
-  border: 1px solid transparent;
-  background: transparent;
-  padding: 0.35rem;
-  font-size: 1rem;
-  cursor: pointer;
-  border-radius: 0.5rem;
-  color: var(--color-text);
-  transition: background-color 0.2s ease, border-color 0.2s ease;
-}
-
-.icon-button:hover:not(:disabled) {
-  border-color: rgba(37, 99, 235, 0.5);
-  background: rgba(37, 99, 235, 0.12);
-}
-
-.quick-add-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: 1rem;
-}
-
-.field {
-  display: flex;
-  flex-direction: column;
-  gap: 0.35rem;
-}
-
-.field span {
-  font-size: 0.85rem;
-  font-weight: 600;
-}
-
-.field input {
-  border: 1px solid var(--color-border);
-  border-radius: 0.75rem;
-  padding: 0.55rem 0.75rem;
-  font-size: 0.95rem;
-  background: var(--color-background-soft);
-  color: var(--color-text);
-}
-
-.quick-add-toggles {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.75rem;
-}
-
-.toggle {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.5rem;
-  font-size: 0.9rem;
-  color: var(--color-text);
-}
-
-.quick-add-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 0.75rem;
-}
-
-.secondary-button {
-  border: 1px solid var(--color-border);
-  background: transparent;
-  color: var(--color-text);
-  padding: 0.5rem 1rem;
-  border-radius: 0.75rem;
-  cursor: pointer;
-}
-
-.primary-button {
-  background: linear-gradient(135deg, #2563eb, #1d4ed8);
-  color: #fff;
-  padding: 0.55rem 1.25rem;
-  border-radius: 0.75rem;
-  border: none;
-  cursor: pointer;
-  font-weight: 600;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.35rem;
-  box-shadow: 0 18px 32px -18px rgba(37, 99, 235, 0.6);
-}
-
-.primary-button:disabled,
-.secondary-button:disabled,
-.icon-button:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
-
-@media (max-width: 640px) {
-  .quick-add-actions {
-    flex-direction: column-reverse;
-  }
-
-  .quick-add-actions button {
-    width: 100%;
-  }
-}
-</style>
 

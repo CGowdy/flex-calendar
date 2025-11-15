@@ -31,76 +31,58 @@ const dayLabel = computed(() => {
 </script>
 
 <template>
-  <section class="day">
-    <header class="day__header">
-      <h3>{{ dayLabel }}</h3>
+  <section class="flex flex-col gap-3">
+    <header class="flex items-center justify-between">
+      <h3 class="text-lg font-semibold text-slate-900 dark:text-white">
+        {{ dayLabel }}
+      </h3>
     </header>
 
-    <div v-if="selectedItem" class="day__content">
-      <div class="card">
-        <div class="row">
-          <span class="muted">Title</span>
-          <strong>{{ selectedItem.title }}</strong>
+    <div v-if="selectedItem" class="grid gap-3">
+      <div class="rounded-xl border border-slate-200 bg-white/95 p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+        <div class="flex items-center justify-between py-1 text-sm text-slate-500 dark:text-slate-400">
+          <span>Title</span>
+          <strong class="text-slate-900 dark:text-white">{{ selectedItem.title }}</strong>
         </div>
-        <div class="row">
-          <span class="muted">Layer</span>
-          <strong>{{ selectedItem.layerKey }}</strong>
+        <div class="flex items-center justify-between py-1 text-sm text-slate-500 dark:text-slate-400">
+          <span>Layer</span>
+          <strong class="text-slate-900 dark:text-white">{{ selectedItem.layerKey }}</strong>
         </div>
-        <div class="row">
-          <span class="muted">Date</span>
-          <strong>{{ new Date(selectedItem.date).toLocaleDateString() }}</strong>
+        <div class="flex items-center justify-between py-1 text-sm text-slate-500 dark:text-slate-400">
+          <span>Date</span>
+          <strong class="text-slate-900 dark:text-white">{{ new Date(selectedItem.date).toLocaleDateString() }}</strong>
         </div>
-        <div class="row">
-          <span class="muted">Duration</span>
-          <strong>{{ selectedItem.durationDays ?? 1 }} day{{ (selectedItem.durationDays ?? 1) === 1 ? '' : 's' }}</strong>
+        <div class="flex items-center justify-between py-1 text-sm text-slate-500 dark:text-slate-400">
+          <span>Duration</span>
+          <strong class="text-slate-900 dark:text-white">
+            {{ selectedItem.durationDays ?? 1 }} day{{ (selectedItem.durationDays ?? 1) === 1 ? '' : 's' }}
+          </strong>
         </div>
       </div>
 
-      <div class="card">
-        <h4>Description</h4>
-        <p v-if="selectedItem.description">{{ selectedItem.description }}</p>
-        <p v-else class="muted">No description provided.</p>
+      <div class="space-y-3 rounded-xl border border-slate-200 bg-white/95 p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+        <div>
+          <h4 class="text-base font-semibold text-slate-900 dark:text-white">Description</h4>
+          <p v-if="selectedItem.description" class="text-sm text-slate-600 dark:text-slate-300">
+            {{ selectedItem.description }}
+          </p>
+          <p v-else class="text-sm text-slate-500 dark:text-slate-400">No description provided.</p>
+        </div>
 
-        <h4>Notes</h4>
-        <p v-if="selectedItem.notes">{{ selectedItem.notes }}</p>
-        <p v-else class="muted">No notes yet.</p>
+        <div>
+          <h4 class="text-base font-semibold text-slate-900 dark:text-white">Notes</h4>
+          <p v-if="selectedItem.notes" class="text-sm text-slate-600 dark:text-slate-300">
+            {{ selectedItem.notes }}
+          </p>
+          <p v-else class="text-sm text-slate-500 dark:text-slate-400">No notes yet.</p>
+        </div>
       </div>
     </div>
 
-    <p v-else class="muted">Select an item to see details.</p>
+    <p v-else class="text-sm text-slate-500 dark:text-slate-400">
+      Select an item to see details.
+    </p>
   </section>
 </template>
-
-<style scoped>
-.day {
-  display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
-}
-.day__header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-.day__content {
-  display: grid;
-  gap: 0.75rem;
-}
-.card {
-  border: 1px solid var(--color-border);
-  background: var(--color-background-soft);
-  border-radius: 0.75rem;
-  padding: 0.75rem;
-}
-.row {
-  display: flex;
-  justify-content: space-between;
-  padding: 0.35rem 0;
-}
-.muted {
-  color: var(--color-text);
-  opacity: 0.75;
-}
-</style>
 
 

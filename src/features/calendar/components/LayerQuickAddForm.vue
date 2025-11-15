@@ -34,13 +34,20 @@ function handleSubmit() {
 </script>
 
 <template>
-  <form class="layer-form" @submit.prevent="handleSubmit">
-    <header>
-      <p class="eyebrow">Add layer</p>
-      <h3>Create a new track</h3>
+  <form
+    class="flex w-full flex-col gap-4"
+    @submit.prevent="handleSubmit"
+  >
+    <header class="space-y-1">
+      <p class="text-[0.65rem] font-semibold uppercase tracking-[0.4em] text-slate-400">
+        Add layer
+      </p>
+      <h3 class="text-base font-semibold text-slate-900 dark:text-white">
+        Create a new track
+      </h3>
     </header>
 
-    <label class="field">
+    <label class="flex flex-col gap-2 text-sm font-semibold text-slate-600 dark:text-slate-200">
       <span>Layer name</span>
       <input
         v-model="name"
@@ -48,26 +55,28 @@ function handleSubmit() {
         placeholder="Marketing plan"
         :disabled="submitting"
         required
+        class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-base text-slate-900 shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
       />
     </label>
 
-    <label class="field color-field">
+    <label class="flex flex-wrap items-center justify-between gap-2 text-sm font-semibold text-slate-600 dark:text-slate-200">
       <span>Color</span>
       <input
         v-model="color"
         type="color"
         :disabled="submitting"
+        class="h-9 w-12 cursor-pointer rounded-lg border border-slate-200 bg-transparent p-0 dark:border-slate-600"
       />
     </label>
 
-    <p v-if="errorMessage" class="error">
+    <p v-if="errorMessage" class="text-sm text-red-500">
       {{ errorMessage }}
     </p>
 
-    <footer class="actions">
+    <footer class="flex flex-col gap-2 sm:flex-row sm:justify-end">
       <button
         type="button"
-        class="ghost-button"
+        class="inline-flex w-full items-center justify-center rounded-xl border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800 sm:w-auto"
         :disabled="submitting"
         @click="emit('cancel')"
       >
@@ -75,7 +84,7 @@ function handleSubmit() {
       </button>
       <button
         type="submit"
-        class="primary-button"
+        class="inline-flex w-full items-center justify-center rounded-xl bg-gradient-to-r from-blue-600 to-indigo-500 px-4 py-2 text-sm font-semibold text-white shadow-lg transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
         :disabled="submitting || name.trim().length === 0"
       >
         <span v-if="submitting">Saving…</span>
@@ -84,98 +93,5 @@ function handleSubmit() {
     </footer>
   </form>
 </template>
-
-<style scoped>
-.layer-form {
-  display: flex;
-  flex-direction: column;
-  gap: 0.85rem;
-  width: 100%;
-}
-
-header {
-  margin-bottom: 0.25rem;
-}
-
-.eyebrow {
-  text-transform: uppercase;
-  font-size: 0.7rem;
-  letter-spacing: 0.08em;
-  color: rgba(148, 163, 184, 0.9);
-  margin-bottom: 0.15rem;
-}
-
-.field {
-  display: flex;
-  flex-direction: column;
-  gap: 0.25rem;
-}
-
-.field span {
-  font-size: 0.85rem;
-  font-weight: 600;
-}
-
-.field input[type='text'] {
-  border: 1px solid rgba(148, 163, 184, 0.4);
-  border-radius: 0.65rem;
-  padding: 0.55rem 0.8rem;
-  font-size: 0.95rem;
-  background: rgba(15, 23, 42, 0.4);
-  color: var(--color-text);
-}
-
-.color-field {
-  flex-direction: row;
-  align-items: center;
-  justify-content: space-between;
-}
-
-.color-field input[type='color'] {
-  width: 2.75rem;
-  height: 2rem;
-  border: none;
-  padding: 0;
-  background: transparent;
-  cursor: pointer;
-}
-
-.actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 0.5rem;
-}
-
-.ghost-button {
-  border: 1px solid rgba(148, 163, 184, 0.4);
-  background: transparent;
-  color: var(--color-text);
-  padding: 0.45rem 0.95rem;
-  border-radius: 0.65rem;
-  cursor: pointer;
-}
-
-.ghost-button:disabled,
-.primary-button:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
-
-.primary-button {
-  border: none;
-  background: linear-gradient(135deg, #6366f1, #2563eb);
-  color: #fff;
-  padding: 0.5rem 1.25rem;
-  border-radius: 0.75rem;
-  cursor: pointer;
-  font-weight: 600;
-  box-shadow: 0 8px 18px -10px rgba(37, 99, 235, 0.6);
-}
-
-.error {
-  font-size: 0.85rem;
-  color: #f87171;
-}
-</style>
 
 

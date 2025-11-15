@@ -228,15 +228,15 @@ async function handleShiftCalendar(payload: ShiftScheduledItemsRequest) {
   <div class="flex w-full flex-col gap-6">
     <section class="flex flex-wrap items-center justify-between gap-4">
       <div>
-        <h1 class="text-2xl font-semibold">Flex Calendar</h1>
-        <p class="text-[var(--color-text)] opacity-75 max-w-2xl mt-1">
+        <h1 class="text-2xl font-semibold text-slate-900 dark:text-white">Flex Calendar</h1>
+        <p class="mt-1 max-w-2xl text-base text-slate-600 dark:text-slate-300">
           Adjust chainable schedules, track exceptions, and keep every layer in sync.
         </p>
       </div>
       <div class="flex flex-wrap items-center gap-3">
         <select
           v-if="hasCalendars"
-          class="min-w-[220px] rounded-lg border border-[var(--color-border)] bg-[var(--color-background)] px-3 py-2 text-[var(--color-text)]"
+          class="min-w-[220px] rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
           :value="activeCalendarId ?? ''"
           :disabled="isBusy"
           @change="handleCalendarChange"
@@ -256,7 +256,7 @@ async function handleShiftCalendar(payload: ShiftScheduledItemsRequest) {
 
         <button
           type="button"
-          class="inline-flex items-center rounded-xl border border-[var(--color-border)] px-4 py-2 text-[var(--color-text)] transition hover:bg-[rgba(37,99,235,0.08)] disabled:cursor-not-allowed disabled:opacity-60"
+          class="inline-flex items-center rounded-xl border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800/70"
           :disabled="isBusy"
           @click="openSetupWizard"
         >
@@ -267,13 +267,13 @@ async function handleShiftCalendar(payload: ShiftScheduledItemsRequest) {
 
     <section
       v-if="showInlineCreate"
-      class="rounded-2xl border border-[var(--color-border)] bg-[var(--color-background-soft)] p-5"
+      class="rounded-2xl border border-slate-200/80 bg-white/95 p-5 shadow-sm dark:border-slate-700/70 dark:bg-slate-900"
     >
       <form
         class="flex w-full max-w-md flex-col gap-4"
         @submit.prevent="handleInlineCreateSubmit"
       >
-        <label class="flex flex-col gap-2 text-sm font-semibold text-[var(--color-text)]">
+        <label class="flex flex-col gap-2 text-sm font-semibold text-slate-600 dark:text-slate-200">
           <span>Calendar name</span>
           <input
             v-model="inlineCalendarName"
@@ -281,14 +281,14 @@ async function handleShiftCalendar(payload: ShiftScheduledItemsRequest) {
             :disabled="isSubmitting"
             placeholder="Roadmap 2025"
             aria-label="New calendar name"
-            class="rounded-xl border border-[var(--color-border)] bg-[var(--color-background)] px-3 py-2 text-base text-[var(--color-text)] focus:outline-none focus:ring-2 focus:ring-blue-500"
+            class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-base text-slate-900 shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
           />
         </label>
 
         <div class="flex flex-wrap justify-end gap-3">
           <button
             type="button"
-            class="inline-flex items-center rounded-xl border border-[var(--color-border)] px-4 py-2 text-[var(--color-text)] transition hover:bg-[rgba(37,99,235,0.08)] disabled:cursor-not-allowed disabled:opacity-60"
+            class="inline-flex items-center rounded-xl border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800/70"
             :disabled="isSubmitting"
             @click="cancelInlineCreate"
           >
@@ -315,7 +315,7 @@ async function handleShiftCalendar(payload: ShiftScheduledItemsRequest) {
 
     <section
       v-if="showQuickAdd && !hasCalendars"
-      class="rounded-2xl border border-[var(--color-border)] bg-[var(--color-background-soft)] p-4"
+      class="rounded-2xl border border-slate-200/80 bg-white/95 p-4 shadow-sm dark:border-slate-700/70 dark:bg-slate-900"
     >
       <CalendarQuickAddForm
         :submitting="isSubmitting"
@@ -349,32 +349,32 @@ async function handleShiftCalendar(payload: ShiftScheduledItemsRequest) {
         <div class="inline-flex gap-2">
           <button
             type="button"
-            class="rounded-lg border border-[var(--color-border)] bg-[var(--color-background)] px-3 py-1 text-sm text-[var(--color-text)] transition hover:bg-[rgba(37,99,235,0.08)]"
-            :class="{ 'border-blue-500 bg-[rgba(37,99,235,0.15)]': viewMode === 'month' }"
+            class="rounded-lg border border-slate-200 bg-white px-3 py-1 text-sm text-slate-600 transition hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800/70"
+            :class="{ 'border-blue-500 bg-blue-50 text-blue-700 dark:border-blue-400 dark:bg-blue-500/20 dark:text-blue-100': viewMode === 'month' }"
             @click="viewMode = 'month'"
           >
             Month
           </button>
           <button
             type="button"
-            class="rounded-lg border border-[var(--color-border)] bg-[var(--color-background)] px-3 py-1 text-sm text-[var(--color-text)] transition hover:bg-[rgba(37,99,235,0.08)]"
-            :class="{ 'border-blue-500 bg-[rgba(37,99,235,0.15)]': viewMode === 'week' }"
+            class="rounded-lg border border-slate-200 bg-white px-3 py-1 text-sm text-slate-600 transition hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800/70"
+            :class="{ 'border-blue-500 bg-blue-50 text-blue-700 dark:border-blue-400 dark:bg-blue-500/20 dark:text-blue-100': viewMode === 'week' }"
             @click="viewMode = 'week'"
           >
             Week
           </button>
           <button
             type="button"
-            class="rounded-lg border border-[var(--color-border)] bg-[var(--color-background)] px-3 py-1 text-sm text-[var(--color-text)] transition hover:bg-[rgba(37,99,235,0.08)]"
-            :class="{ 'border-blue-500 bg-[rgba(37,99,235,0.15)]': viewMode === 'day' }"
+            class="rounded-lg border border-slate-200 bg-white px-3 py-1 text-sm text-slate-600 transition hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800/70"
+            :class="{ 'border-blue-500 bg-blue-50 text-blue-700 dark:border-blue-400 dark:bg-blue-500/20 dark:text-blue-100': viewMode === 'day' }"
             @click="viewMode = 'day'"
           >
             Day
           </button>
           <button
             type="button"
-            class="rounded-lg border border-[var(--color-border)] bg-[var(--color-background)] px-3 py-1 text-sm text-[var(--color-text)] transition hover:bg-[rgba(37,99,235,0.08)]"
-            :class="{ 'border-blue-500 bg-[rgba(37,99,235,0.15)]': viewMode === 'board' }"
+            class="rounded-lg border border-slate-200 bg-white px-3 py-1 text-sm text-slate-600 transition hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800/70"
+            :class="{ 'border-blue-500 bg-blue-50 text-blue-700 dark:border-blue-400 dark:bg-blue-500/20 dark:text-blue-100': viewMode === 'board' }"
             @click="viewMode = 'board'"
           >
             Board
@@ -421,7 +421,7 @@ async function handleShiftCalendar(payload: ShiftScheduledItemsRequest) {
 
     <section
       v-else-if="!isLoading"
-      class="flex flex-col items-center justify-center gap-4 rounded-2xl border border-dashed border-[var(--color-border)] bg-[var(--color-background-soft)] p-12 text-center"
+      class="flex flex-col items-center justify-center gap-4 rounded-2xl border border-dashed border-slate-300 bg-slate-50/60 p-12 text-center text-slate-600 dark:border-slate-600 dark:bg-slate-900/60 dark:text-slate-300"
     >
       <p>
         Start by creating your first calendar. Use quick add for defaults or the
@@ -438,7 +438,7 @@ async function handleShiftCalendar(payload: ShiftScheduledItemsRequest) {
         </button>
         <button
           type="button"
-          class="inline-flex items-center rounded-xl border border-[var(--color-border)] px-4 py-2 text-[var(--color-text)] transition hover:bg-[rgba(37,99,235,0.08)] disabled:cursor-not-allowed disabled:opacity-60"
+          class="inline-flex items-center rounded-xl border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800/70"
           :disabled="isBusy"
           @click="openSetupWizard"
         >
@@ -449,7 +449,7 @@ async function handleShiftCalendar(payload: ShiftScheduledItemsRequest) {
 
     <div
       v-if="isBusy"
-      class="fixed bottom-6 right-6 flex items-center gap-3 rounded-full bg-[rgba(15,23,42,0.9)] px-4 py-2 text-sm text-white shadow-2xl"
+      class="fixed bottom-6 right-6 flex items-center gap-3 rounded-full bg-slate-900/90 px-4 py-2 text-sm text-white shadow-2xl"
       role="status"
     >
       <span

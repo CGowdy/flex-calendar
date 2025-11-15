@@ -78,6 +78,16 @@ async function handleLayerSubmit(payload: { name: string; color: string }) {
   }
 }
 
+const popoverPt = {
+  root: {
+    class:
+      'w-[min(420px,80vw)] rounded-2xl border border-slate-200 bg-white/95 p-0 shadow-2xl dark:border-slate-700 dark:bg-slate-900',
+  },
+  content: {
+    class: 'p-1',
+  },
+} as const
+
 const upcomingItems = computed<ScheduledItem[]>(() => {
   const today = new Date()
   const sorted = [...props.calendar.scheduledItems].sort(
@@ -103,15 +113,15 @@ function formatDate(date: Date | null): string {
 </script>
 
 <template>
-  <aside class="timeline">
-    <header class="timeline__header">
-      <h2>{{ calendar.name }}</h2>
-      <p class="timeline__meta">
+  <aside class="flex flex-col gap-5 rounded-2xl border border-slate-200 bg-white/95 p-5 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+    <header>
+      <h2 class="text-lg font-semibold text-slate-900 dark:text-white">{{ calendar.name }}</h2>
+      <p class="text-sm text-slate-500 dark:text-slate-400">
         {{ calendar.layers.length }} layer<span v-if="calendar.layers.length !== 1">s</span>
       </p>
     </header>
 
-    <section class="timeline__tools">
+    <section class="border-t border-slate-200 pt-4 dark:border-slate-700">
       <MiniCalendar
         :model-value="miniDate"
         @update:model-value="(d) => (miniDate = d)"
@@ -119,13 +129,13 @@ function formatDate(date: Date | null): string {
       />
     </section>
 
-    <section class="timeline__calendars">
-      <div class="cal-header">
-        <h3>Layers</h3>
-        <div class="cal-header__actions">
+    <section class="space-y-3 border-t border-slate-200 pt-4 dark:border-slate-700">
+      <div class="flex items-center justify-between gap-2">
+        <h3 class="text-base font-semibold text-slate-900 dark:text-white">Layers</h3>
+        <div class="relative">
           <button
             type="button"
-            class="cal-add-button"
+            class="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 text-slate-600 transition hover:bg-slate-100 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800/70"
             :aria-pressed="quickAddOpen"
             :disabled="isCreatingLayer"
             ref="quickAddButtonRef"
@@ -142,9 +152,10 @@ function formatDate(date: Date | null): string {
             :dismissable="!isCreatingLayer"
             :show-close-icon="false"
             :focus-on-show="false"
+            :pt="popoverPt"
             @hide="handlePopoverHide"
           >
-            <div class="quick-add-popover" role="dialog" aria-label="Quick add layer">
+            <div role="dialog" aria-label="Quick add layer">
               <LayerQuickAddForm
                 :key="formInstanceKey"
                 :submitting="isCreatingLayer"
@@ -156,18 +167,26 @@ function formatDate(date: Date | null): string {
           </Popover>
         </div>
       </div>
-      <ul class="cal-list">
-        <li v-for="layer in calendar.layers" :key="layer.key" class="cal-item">
-          <label class="cal-row">
+      <ul class="space-y-2">
+        <li
+          v-for="layer in calendar.layers"
+          :key="layer.key"
+          class="rounded-2xl border border-slate-200 bg-white/80 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-800/60"
+        >
+          <label class="grid grid-cols-[auto_auto_1fr_auto] items-center gap-3">
             <input
               type="checkbox"
               :checked="store.visibleLayerKeys.includes(layer.key)"
+              class="h-4 w-4 rounded border-slate-300 text-brand focus:ring-brand dark:border-slate-600"
               @change="store.setLayerVisibility(layer.key, ($event.target as HTMLInputElement).checked)"
             />
-            <span class="swatch" :style="{ backgroundColor: layer.color || '#64748b' }" />
-            <span class="cal-name">{{ layer.name }}</span>
+            <span
+              class="h-3.5 w-3.5 rounded border border-slate-200 dark:border-slate-600"
+              :style="{ backgroundColor: layer.color || '#64748b' }"
+            />
+            <span class="font-medium text-slate-700 dark:text-slate-200">{{ layer.name }}</span>
             <input
-              class="color"
+              class="h-5 w-10 cursor-pointer rounded border border-slate-200 bg-transparent p-0 dark:border-slate-600"
               type="color"
               :value="layer.color || '#64748b'"
               title="Color"
@@ -179,198 +198,31 @@ function formatDate(date: Date | null): string {
       </ul>
     </section>
 
-    <section class="timeline__upcoming">
-      <h3>Upcoming items</h3>
-      <ul>
+    <section class="space-y-3 border-t border-slate-200 pt-4 dark:border-slate-700">
+      <h3 class="text-base font-semibold text-slate-900 dark:text-white">Upcoming items</h3>
+      <ul class="space-y-2">
         <li
           v-for="item in upcomingItems"
           :key="item.id"
         >
           <button
             type="button"
-            class="upcoming-day"
-            :class="{ active: selectedDayId === item.id }"
+            class="grid w-full grid-cols-[1fr_auto_auto] items-center gap-3 rounded-xl border border-transparent bg-slate-100 px-3 py-2 text-left text-sm text-slate-700 transition hover:border-slate-200 hover:bg-slate-50 dark:bg-slate-800/60 dark:text-slate-200"
+            :class="{ 'border-blue-500 bg-blue-50 text-blue-700 dark:border-blue-400 dark:bg-blue-500/20 dark:text-blue-100': selectedDayId === item.id }"
             @click="emit('select-day', item.id)"
           >
-            <span class="day-label">{{ item.title }}</span>
-            <span class="day-date">{{ formatDate(new Date(item.date)) }}</span>
-            <span class="chip">{{ item.layerKey }}</span>
+            <span class="font-semibold">{{ item.title }}</span>
+            <span class="text-xs text-slate-500 dark:text-slate-400">{{ formatDate(new Date(item.date)) }}</span>
+            <span class="rounded-full bg-blue-50 px-2 py-0.5 text-[0.65rem] font-semibold uppercase tracking-wider text-blue-600 dark:bg-blue-500/20 dark:text-blue-100">
+              {{ item.layerKey }}
+            </span>
           </button>
         </li>
       </ul>
-      <p v-if="upcomingItems.length === 0" class="empty">
+      <p v-if="upcomingItems.length === 0" class="text-center text-sm text-slate-500 dark:text-slate-400">
         You're ahead of schedule! No remaining items scheduled.
       </p>
     </section>
   </aside>
 </template>
-
-<style scoped>
-.timeline {
-  display: flex;
-  flex-direction: column;
-  gap: 1.25rem;
-  padding: 1.25rem;
-  border-radius: 1rem;
-  border: 1px solid var(--color-border);
-  background: var(--color-background-soft);
-}
-
-.timeline__header h2 {
-  font-size: 1.15rem;
-  margin-bottom: 0.25rem;
-}
-
-.timeline__meta {
-  font-size: 0.9rem;
-  color: var(--color-text);
-  opacity: 0.75;
-}
-
-.timeline__upcoming ul {
-  list-style: none;
-  padding: 0;
-  margin: 0;
-  display: grid;
-  gap: 0.5rem;
-}
-
-.timeline__tools {
-  border-top: 1px solid var(--color-border);
-  padding-top: 0.75rem;
-}
-
-.timeline__calendars {
-  border-top: 1px solid var(--color-border);
-  padding-top: 0.75rem;
-  display: grid;
-  gap: 0.5rem;
-}
-
-.cal-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  position: relative;
-  gap: 0.5rem;
-}
-
-.cal-header__actions {
-  position: relative;
-}
-
-.cal-add-button {
-  border: 1px solid var(--color-border);
-  background: var(--color-background);
-  color: var(--color-text);
-  inline-size: 1.9rem;
-  block-size: 1.9rem;
-  border-radius: 0.5rem;
-  font-size: 1.25rem;
-  line-height: 1;
-  display: grid;
-  place-items: center;
-  cursor: pointer;
-  transition: background-color 0.2s ease, border-color 0.2s ease;
-}
-
-.cal-add-button[aria-pressed='true'],
-.cal-add-button:hover {
-  border-color: rgba(37, 99, 235, 0.65);
-  background: rgba(37, 99, 235, 0.12);
-}
-
-.p-popover {
-  width: min(420px, 80vw);
-  border-radius: 1rem;
-  border: 1px solid var(--color-border);
-  background: var(--color-background);
-  padding: 0;
-  box-shadow: 0 30px 60px -30px rgba(15, 23, 42, 0.65);
-}
-
-.quick-add-popover {
-  padding: 0.25rem;
-}
-
-.quick-add-popover :deep(.quick-add-card) {
-  width: 100%;
-  box-shadow: none;
-}
-
-.sr-only {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  padding: 0;
-  margin: -1px;
-  overflow: hidden;
-  clip: rect(0, 0, 0, 0);
-  border: 0;
-}
-.cal-list { list-style: none; padding: 0; margin: 0; display: grid; gap: 0.4rem; }
-.cal-row { display: grid; grid-template-columns: auto auto 1fr auto; gap: 0.5rem; align-items: center; }
-.swatch { width: 0.8rem; height: 0.8rem; border-radius: 2px; border: 1px solid var(--color-border); }
-.color { inline-size: 2rem; block-size: 1.2rem; padding: 0; border: none; background: transparent; }
-
-.upcoming-day {
-  width: 100%;
-  display: grid;
-  grid-template-columns: 1fr auto auto;
-  align-items: center;
-  gap: 0.75rem;
-  padding: 0.65rem 0.75rem;
-  border-radius: 0.75rem;
-  border: 1px solid transparent;
-  background: var(--color-background-mute);
-  cursor: pointer;
-  transition: border-color 0.2s ease, background-color 0.2s ease;
-}
-
-.upcoming-day:hover {
-  border-color: rgba(37, 99, 235, 0.35);
-  background: rgba(37, 99, 235, 0.12);
-}
-
-.upcoming-day.active {
-  border-color: rgba(37, 99, 235, 0.6);
-  background: rgba(37, 99, 235, 0.2);
-}
-
-.day-label {
-  font-weight: 600;
-  font-size: 0.95rem;
-  text-align: left;
-}
-
-.day-date {
-  font-size: 0.85rem;
-  color: var(--color-text);
-  opacity: 0.85;
-}
-
-.chip {
-  font-size: 0.75rem;
-  background: rgba(37, 99, 235, 0.12);
-  color: #1d4ed8;
-  padding: 0.2rem 0.55rem;
-  border-radius: 999px;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-}
-
-.empty {
-  font-size: 0.85rem;
-  color: var(--color-text);
-  opacity: 0.75;
-  margin-top: 0.75rem;
-  text-align: center;
-}
-
-@media (max-width: 640px) {
-  .timeline {
-    padding: 1rem;
-  }
-}
-</style>
 
