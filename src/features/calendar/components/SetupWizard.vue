@@ -1,7 +1,10 @@
 <script setup lang="ts">
 import { computed, reactive } from 'vue'
 
-import type { CreateCalendarRequest } from '@/features/calendar/types/calendar'
+import type {
+  CreateCalendarLayerInput,
+  CreateCalendarRequest,
+} from '@/features/calendar/types/calendar'
 
 const props = defineProps<{
   submitting?: boolean
@@ -95,9 +98,9 @@ function handleSubmit() {
     return
   }
 
-  const layers = layerOptions
+  const layers: CreateCalendarLayerInput[] = layerOptions
     .filter((layer) => layer.selected)
-    .map((layer) => ({
+    .map((layer): CreateCalendarLayerInput => ({
       key: layer.key,
       name: layer.name,
       color: layer.color,
@@ -107,7 +110,7 @@ function handleSubmit() {
       templateConfig:
         layer.templateMode === 'generated'
           ? {
-              mode: 'generated',
+              mode: 'generated' as const,
               itemCount: layer.templateItemCount,
               titlePattern: layer.titlePattern?.trim() || undefined,
             }

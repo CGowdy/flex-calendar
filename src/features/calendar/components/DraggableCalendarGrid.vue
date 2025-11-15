@@ -36,9 +36,7 @@ const groupedItems = computed(() => {
   }
 
   for (const [key, items] of groups.entries()) {
-    items.sort(
-      (a, b) => (a.sequenceIndex ?? a.groupingSequence) - (b.sequenceIndex ?? b.groupingSequence)
-    )
+    items.sort((a, b) => (a.sequenceIndex ?? 0) - (b.sequenceIndex ?? 0))
     groups.set(key, items)
   }
 

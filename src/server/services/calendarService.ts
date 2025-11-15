@@ -31,6 +31,22 @@ import { nanoid } from '../utils/id.js'
 type ScheduledItemSubdocument = CalendarDocument['scheduledItems'][number]
 type CalendarLayerSubdocument = CalendarDocument['layers'][number]
 
+type LayerInput = {
+  key: string
+  name: string
+  color?: string
+  description?: string
+  chainBehavior?: 'linked' | 'independent'
+  autoShift?: boolean
+  kind?: 'standard' | 'exception'
+  titlePattern?: string
+  templateConfig?: {
+    mode?: 'generated' | 'manual'
+    itemCount?: number
+    titlePattern?: string
+  }
+}
+
 const DEFAULT_LAYERS: Array<
   CalendarLayer & {
     templateConfig?: {
@@ -155,12 +171,33 @@ function normalizeLayers(layers: CreateCalendarInput['layers']): NormalizedLayer
     }))
   }
 
-  if (layers.length === 0) {
+  const definedLayers = layers as LayerInput[]
+
+  if (definedLayers.length === 0) {
     return []
   }
 
-  return layers.map((layer) => {
+  return definedLayers.map((layer) => {
     const kind = layer.kind ?? 'standard'
+    const providedTemplateConfig: NormalizedLayer['templateConfig'] | undefined =
+      layer.templateConfig
+        ? {
+            mode: layer.templateConfig.mode ?? 'generated',
+            itemCount: layer.templateConfig.itemCount,
+            titlePattern: layer.templateConfig.titlePattern ?? layer.titlePattern,
+          }
+        : undefined
+
+    const fallbackTemplateConfig: NormalizedLayer['templateConfig'] =
+      kind === 'standard'
+        ? {
+            mode: 'generated' as const,
+            itemCount:
+              providedTemplateConfig?.itemCount ?? DEFAULT_TEMPLATE_ITEM_COUNT,
+            titlePattern: providedTemplateConfig?.titlePattern ?? layer.titlePattern,
+          }
+        : { mode: 'manual' as const }
+
     const normalized: NormalizedLayer = {
       layer: {
         key: layer.key,
@@ -170,20 +207,12 @@ function normalizeLayers(layers: CreateCalendarInput['layers']): NormalizedLayer
         autoShift: resolveChainBehavior(layer.chainBehavior, layer.autoShift, kind),
         kind,
       } as CalendarLayer,
-      templateConfig:
-        layer.templateConfig ??
-        (kind === 'standard'
-          ? {
-              mode: 'generated',
-              itemCount:
-                layer.templateConfig?.itemCount ?? DEFAULT_TEMPLATE_ITEM_COUNT,
-              titlePattern: layer.titlePattern,
-            }
-          : { mode: 'manual' }),
+      templateConfig: providedTemplateConfig ?? fallbackTemplateConfig,
     }
 
     if (layer.titlePattern && !normalized.templateConfig?.titlePattern) {
-      normalized.templateConfig = normalized.templateConfig ?? { mode: 'generated' }
+      normalized.templateConfig =
+        normalized.templateConfig ?? { mode: 'generated' as const }
       normalized.templateConfig.titlePattern = layer.titlePattern
     }
 

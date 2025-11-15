@@ -52,12 +52,14 @@ describe('calendarService.shiftScheduledItems', () => {
           key: 'reference',
           name: 'Reference',
           chainBehavior: 'linked',
+          kind: 'standard',
           templateConfig: { mode: 'generated', itemCount: 10, titlePattern: 'Ref {n}' },
         },
         {
           key: 'progress-a',
           name: 'Progress A',
           chainBehavior: 'linked',
+          kind: 'standard',
           templateConfig: { mode: 'generated', itemCount: 10, titlePattern: 'Progress {n}' },
         },
         {
@@ -124,12 +126,14 @@ describe('calendarService.shiftScheduledItems', () => {
           key: 'reference',
           name: 'Reference',
           chainBehavior: 'linked',
+          kind: 'standard',
           templateConfig: { mode: 'generated', itemCount: 5, titlePattern: 'Ref {n}' },
         },
         {
           key: 'progress-b',
           name: 'Progress B',
           chainBehavior: 'linked',
+          kind: 'standard',
           templateConfig: { mode: 'generated', itemCount: 5, titlePattern: 'Progress {n}' },
         },
       ],
@@ -169,6 +173,8 @@ describe('calendarService.createCalendar', () => {
   it('creates an empty calendar without a start date', async () => {
     const calendar = await createCalendar({
       name: 'Idea Backlog',
+      includeWeekends: false,
+      includeExceptions: false,
       layers: [],
     })
 

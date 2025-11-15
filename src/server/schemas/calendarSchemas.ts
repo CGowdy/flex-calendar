@@ -23,9 +23,12 @@ export const layerSchema = z.object({
   templateConfig: layerTemplateSchema.optional(),
 })
 
+export type LayerInput = z.infer<typeof layerSchema>
+
 export const createCalendarSchema = z.object({
   name: z.string().min(1),
   presetKey: z.string().optional(),
+  source: z.string().optional(), // legacy alias
   startDate: z.string().datetime().optional(),
   includeWeekends: z.boolean().optional().default(false),
   includeExceptions: z.boolean().optional().default(false),

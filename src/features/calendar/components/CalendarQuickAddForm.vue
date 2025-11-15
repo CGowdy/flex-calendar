@@ -32,7 +32,11 @@ const isValid = computed(
 )
 
 function toISODate(dateString: string): string {
-  const [year, month, day] = dateString.split('-').map((value) => Number(value))
+  const [yearPart, monthPart, dayPart] = dateString.split('-')
+  const year = Number(yearPart)
+  const month = Number(monthPart)
+  const day = Number(dayPart)
+
   if (
     Number.isNaN(year) ||
     Number.isNaN(month) ||

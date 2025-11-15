@@ -31,6 +31,7 @@ async function seedSampleCalendar() {
         name: 'Reference Layer',
         color: '#2563eb',
         chainBehavior: 'linked',
+        kind: 'standard',
         templateConfig: {
           mode: 'generated',
           itemCount: 170,
@@ -42,6 +43,7 @@ async function seedSampleCalendar() {
         name: 'Progress A',
         color: '#059669',
         chainBehavior: 'linked',
+        kind: 'standard',
         templateConfig: {
           mode: 'generated',
           itemCount: 170,

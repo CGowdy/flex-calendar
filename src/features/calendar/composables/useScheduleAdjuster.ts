@@ -153,7 +153,7 @@ export function useScheduleAdjuster() {
       return workingCopy
     }
 
-    const targetId = payload.scheduledItemId ?? payload.dayId
+    const targetId = payload.scheduledItemId
     const targetItem = workingCopy.scheduledItems.find(
       (item) => item.id === targetId
     )
@@ -163,7 +163,7 @@ export function useScheduleAdjuster() {
 
     const effectiveLayerKeys = toEffectiveLayerKeys(
       workingCopy,
-      payload.layerKeys ?? payload.groupingKeys
+      payload.layerKeys
     )
 
     const exceptionDates = getExceptionDates(workingCopy)
@@ -176,19 +176,17 @@ export function useScheduleAdjuster() {
       exceptionDates
     )
 
-    const startingSequence =
-      targetItem.sequenceIndex ?? targetItem.groupingSequence
+    const startingSequence = targetItem.sequenceIndex ?? 0
 
     const itemsToReflow = workingCopy.scheduledItems
       .filter(
         (item) =>
           effectiveLayerKeys.has(item.layerKey) &&
-          (item.sequenceIndex ?? item.groupingSequence) >= startingSequence
+          (item.sequenceIndex ?? 0) >= startingSequence
       )
       .sort(
         (a, b) =>
-          (a.sequenceIndex ?? a.groupingSequence) -
-          (b.sequenceIndex ?? b.groupingSequence)
+        (a.sequenceIndex ?? 0) - (b.sequenceIndex ?? 0)
       )
 
     if (itemsToReflow.length === 0) {
