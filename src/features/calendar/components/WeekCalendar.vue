@@ -1,11 +1,11 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
-import type { Calendar, CalendarDay } from '@/features/calendar/types/calendar'
+import type { Calendar, ScheduledItem } from '@/features/calendar/types/calendar'
 
 const props = defineProps<{
   calendar: Calendar
   selectedDayId: string | null
-  visibleGroupingKeys?: string[]
+  visibleLayerKeys?: string[]
 }>()
 
 const emit = defineEmits<{
@@ -45,14 +45,14 @@ function dayKey(d: Date) {
   return d.toISOString().slice(0, 10)
 }
 
-const dayMap = computed<Record<string, CalendarDay[]>>(() => {
-  const map: Record<string, CalendarDay[]> = {}
-  const allow = props.visibleGroupingKeys ? new Set(props.visibleGroupingKeys) : null
-  for (const day of props.calendar.days) {
-    if (allow && !allow.has(day.groupingKey)) continue
-    const key = dayKey(new Date(day.date))
+const scheduledItemsByDate = computed<Record<string, ScheduledItem[]>>(() => {
+  const map: Record<string, ScheduledItem[]> = {}
+  const allow = props.visibleLayerKeys ? new Set(props.visibleLayerKeys) : null
+  for (const item of props.calendar.scheduledItems) {
+    if (allow && !allow.has(item.layerKey)) continue
+    const key = dayKey(new Date(item.date))
     if (!map[key]) map[key] = []
-    map[key].push(day)
+    map[key]!.push(item)
   }
   return map
 })
@@ -69,33 +69,56 @@ const headerLabel = computed(() => {
 </script>
 
 <template>
-  <section class="week">
-    <header class="week__header">
-      <button class="nav" @click="prevWeek" aria-label="Previous week">‹</button>
-      <h3>{{ headerLabel }}</h3>
-      <button class="nav" @click="nextWeek" aria-label="Next week">›</button>
+  <section class="flex flex-col gap-4">
+    <header class="flex items-center justify-between gap-3">
+      <button
+        type="button"
+        class="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 text-slate-600 transition hover:bg-slate-100 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800/70"
+        @click="prevWeek"
+        aria-label="Previous week"
+      >
+        ‹
+      </button>
+      <h3 class="text-lg font-semibold text-slate-900 dark:text-white">{{ headerLabel }}</h3>
+      <button
+        type="button"
+        class="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 text-slate-600 transition hover:bg-slate-100 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800/70"
+        @click="nextWeek"
+        aria-label="Next week"
+      >
+        ›
+      </button>
     </header>
 
-    <div class="week__grid">
-      <div class="weekday" v-for="d in ['Sun','Mon','Tue','Wed','Thu','Fri','Sat']" :key="d">{{ d }}</div>
+    <div class="grid grid-cols-7 gap-px rounded-2xl bg-slate-200/70 p-px dark:bg-slate-700/60">
+      <div
+        v-for="d in ['Sun','Mon','Tue','Wed','Thu','Fri','Sat']"
+        :key="d"
+        class="bg-slate-50 py-2 text-center text-xs font-semibold uppercase tracking-wide text-slate-500 dark:bg-slate-800/70 dark:text-slate-300"
+      >
+        {{ d }}
+      </div>
       <template v-for="date in days" :key="date.toISOString()">
-        <div class="cell">
-          <div class="cell__date">
+        <div class="min-h-[140px] bg-white p-2 dark:bg-slate-900">
+          <div class="text-xs font-semibold text-slate-500 dark:text-slate-400">
             {{ new Intl.DateTimeFormat(undefined, { month: 'short', day: 'numeric' }).format(date) }}
           </div>
-          <ul class="events">
-            <li v-for="day in (dayMap[dayKey(date)] ?? [])" :key="day.id">
+          <ul class="mt-1 flex flex-col gap-1">
+            <li v-for="item in (scheduledItemsByDate[dayKey(date)] ?? [])" :key="item.id">
               <button
                 type="button"
-                class="event"
-                :class="{ active: selectedDayId === day.id }"
-                @click="emit('select-day', day.id)"
+                class="flex w-full items-center gap-2 rounded-md border border-transparent bg-slate-100 px-2 py-1 text-xs font-medium text-slate-700 transition hover:border-slate-200 dark:bg-slate-800/60 dark:text-slate-200"
+                :class="{ 'border-blue-500 bg-blue-50 text-blue-700 dark:border-blue-400 dark:bg-blue-500/20 dark:text-blue-100': selectedDayId === item.id }"
+                @click="emit('select-day', item.id)"
               >
-                <span class="dot"
-                  :style="{ backgroundColor: (calendar.groupings.find(g => g.key === day.groupingKey)?.color) || '#2563eb' }"
+                <span
+                  class="h-2 w-2 rounded-full"
+                  :style="{ backgroundColor: (calendar.layers.find(layer => layer.key === item.layerKey)?.color) || '#2563eb' }"
                 />
-                <span class="event__label">{{ day.label }}</span>
-                <span v-if="day.events[0]?.title" class="event__title">{{ day.events[0]?.title }}</span>
+                <span class="truncate">{{ item.title }}</span>
+                <span v-if="item.description" class="hidden text-[0.65rem] text-slate-500 dark:text-slate-400 lg:inline">
+                  {{ item.description }}
+                </span>
               </button>
             </li>
           </ul>
@@ -104,94 +127,5 @@ const headerLabel = computed(() => {
     </div>
   </section>
 </template>
-
-<style scoped>
-.week {
-  display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
-}
-.week__header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-.nav {
-  border: 1px solid var(--color-border);
-  background: var(--color-background);
-  color: var(--color-text);
-  padding: 0.25rem 0.6rem;
-  border-radius: 0.5rem;
-  cursor: pointer;
-}
-.week__grid {
-  display: grid;
-  grid-template-columns: repeat(7, 1fr);
-  gap: 1px;
-  background: var(--color-border);
-  border: 1px solid var(--color-border);
-  border-radius: 0.75rem;
-  overflow: hidden;
-}
-.weekday {
-  background: var(--color-background-soft);
-  padding: 0.5rem;
-  font-size: 0.8rem;
-  text-align: center;
-  color: var(--color-text);
-  opacity: 0.85;
-}
-.cell {
-  min-height: 140px;
-  background: var(--color-background);
-  padding: 0.5rem;
-  display: flex;
-  flex-direction: column;
-  gap: 0.25rem;
-}
-.cell__date {
-  font-size: 0.85rem;
-  opacity: 0.75;
-}
-.events {
-  list-style: none;
-  padding: 0;
-  margin: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 0.25rem;
-}
-.event {
-  width: 100%;
-  display: inline-flex;
-  gap: 0.4rem;
-  align-items: center;
-  border: 1px solid transparent;
-  background: var(--color-background-mute);
-  color: var(--color-text);
-  border-radius: 0.5rem;
-  padding: 0.2rem 0.35rem;
-  cursor: pointer;
-  text-align: left;
-}
-.event.active {
-  border-color: rgba(37, 99, 235, 0.5);
-  background: rgba(37, 99, 235, 0.15);
-}
-.dot {
-  width: 0.5rem;
-  height: 0.5rem;
-  border-radius: 999px;
-  display: inline-block;
-}
-.event__label {
-  font-size: 0.8rem;
-  font-weight: 600;
-}
-.event__title {
-  font-size: 0.75rem;
-  opacity: 0.85;
-}
-</style>
 
 

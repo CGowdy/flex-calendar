@@ -25,7 +25,7 @@ NODE_ENV=development
 PORT=3333
 HOST=0.0.0.0
 # Connect to local Docker Mongo (see infra/docker-compose.dev.yml)
-MONGODB_URI=mongodb://root:example@localhost:27017/my-abeka-calendar?authMechanism=DEFAULT
+MONGODB_URI=mongodb://root:example@localhost:27017/flex-calendar?authMechanism=DEFAULT
 # CORS not needed; Vite dev server proxies /api
 # CORS_ORIGIN=http://localhost:5173
 # Frontend uses Vite proxy; leave unset unless bypassing proxy
@@ -50,7 +50,7 @@ NODE_ENV=production
 PORT=3333
 HOST=0.0.0.0
 # API connects to the mongo container by name inside the compose network
-MONGODB_URI=mongodb://root:example@mongo:27017/my-abeka-calendar?authMechanism=DEFAULT
+MONGODB_URI=mongodb://root:example@mongo:27017/flex-calendar?authMechanism=DEFAULT
 # Caddy serves SPA and proxies /api -> api:3333; no CORS needed
 # VITE_API_URL=/api
 EOF

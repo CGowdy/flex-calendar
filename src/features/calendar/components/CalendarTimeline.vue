@@ -1,9 +1,14 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import MiniCalendar from './MiniCalendar.vue'
+import LayerQuickAddForm from './LayerQuickAddForm.vue'
+import Popover from 'primevue/popover'
 import { useCalendarStore } from '@stores/useCalendarStore'
 
-import type { Calendar, CalendarDay } from '@/features/calendar/types/calendar'
+import type {
+  Calendar,
+  ScheduledItem,
+} from '@/features/calendar/types/calendar'
 
 const props = defineProps<{
   calendar: Calendar
@@ -17,6 +22,12 @@ const emit = defineEmits<{
 }>()
 
 const store = useCalendarStore()
+const quickAddPopover = ref<InstanceType<typeof Popover> | null>(null)
+const quickAddButtonRef = ref<HTMLElement | null>(null)
+const quickAddOpen = ref(false)
+const isCreatingLayer = ref(false)
+const layerError = ref<string | null>(null)
+const formInstanceKey = ref(0)
 
 // Keep a local month for the mini calendar so arrow navigation doesn't move the big calendar.
 const miniDate = ref(new Date(props.viewDate))
@@ -27,34 +38,63 @@ watch(
   }
 )
 
-const startDate = computed(() => new Date(props.calendar.startDate))
-const projectedEndDate = computed(() => {
-  const lastDay = props.calendar.days[props.calendar.days.length - 1]
-  return lastDay ? new Date(lastDay.date) : null
-})
-
-const totalDays = computed(() => props.calendar.totalDays)
-
-const completionPercent = computed(() => {
-  if (!props.selectedDayId) {
-    return 0
+function handleQuickAddToggle(event: Event) {
+  if (isCreatingLayer.value) {
+    return
   }
-  const index = props.calendar.days.findIndex(
-    (day) => day.id === props.selectedDayId
-  )
-  if (index < 0) {
-    return 0
+  if (quickAddOpen.value) {
+    quickAddPopover.value?.hide()
+    return
   }
-  return Math.round(((index + 1) / props.calendar.days.length) * 100)
-})
+  quickAddOpen.value = true
+  if (quickAddButtonRef.value) {
+    quickAddPopover.value?.show(event, quickAddButtonRef.value)
+  }
+}
 
-const upcomingDays = computed<CalendarDay[]>(() => {
+function handlePopoverHide() {
+  quickAddOpen.value = false
+  layerError.value = null
+  formInstanceKey.value += 1
+}
+
+async function handleLayerSubmit(payload: { name: string; color: string }) {
+  if (isCreatingLayer.value) return
+  layerError.value = null
+  isCreatingLayer.value = true
+  try {
+    await store.createLayerForActiveCalendar({
+      name: payload.name,
+      color: payload.color,
+    })
+    quickAddPopover.value?.hide()
+    quickAddOpen.value = false
+    formInstanceKey.value += 1
+  } catch (error) {
+    layerError.value =
+      error instanceof Error ? error.message : 'Failed to create layer'
+  } finally {
+    isCreatingLayer.value = false
+  }
+}
+
+const popoverPt = {
+  root: {
+    class:
+      'w-[min(420px,80vw)] rounded-2xl border border-slate-200 bg-white/95 p-0 shadow-2xl dark:border-slate-700 dark:bg-slate-900',
+  },
+  content: {
+    class: 'p-1',
+  },
+} as const
+
+const upcomingItems = computed<ScheduledItem[]>(() => {
   const today = new Date()
-  const sorted = [...props.calendar.days].sort(
+  const sorted = [...props.calendar.scheduledItems].sort(
     (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()
   )
   const future = sorted.filter(
-    (day) => new Date(day.date).getTime() >= today.setHours(0, 0, 0, 0)
+    (item) => new Date(item.date).getTime() >= today.setHours(0, 0, 0, 0)
   )
   return future.slice(0, 6)
 })
@@ -73,42 +113,15 @@ function formatDate(date: Date | null): string {
 </script>
 
 <template>
-  <aside class="timeline">
-    <header class="timeline__header">
-      <h2>{{ calendar.name }}</h2>
-      <p class="timeline__meta">
-        {{ calendar.groupings.length }} grouping track<span v-if="calendar.groupings.length !== 1">s</span>
+  <aside class="flex flex-col gap-5 rounded-2xl border border-slate-200 bg-white/95 p-5 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+    <header>
+      <h2 class="text-lg font-semibold text-slate-900 dark:text-white">{{ calendar.name }}</h2>
+      <p class="text-sm text-slate-500 dark:text-slate-400">
+        {{ calendar.layers.length }} layer<span v-if="calendar.layers.length !== 1">s</span>
       </p>
     </header>
 
-    <section class="timeline__stats">
-      <article class="stat-card">
-        <span class="stat-label">Start date</span>
-        <strong>{{ formatDate(startDate) }}</strong>
-      </article>
-
-      <article class="stat-card">
-        <span class="stat-label">Projected end</span>
-        <strong>{{ formatDate(projectedEndDate) }}</strong>
-      </article>
-
-      <article class="stat-card">
-        <span class="stat-label">Total lessons</span>
-        <strong>{{ totalDays }}</strong>
-      </article>
-    </section>
-
-    <section class="timeline__progress">
-      <span>Progress</span>
-      <div class="progress-bar" role="progressbar" :aria-valuenow="completionPercent" aria-valuemin="0" aria-valuemax="100">
-        <div class="progress-bar__value" :style="{ width: `${completionPercent}%` }" />
-      </div>
-      <span class="progress-label">
-        {{ completionPercent }}% complete
-      </span>
-    </section>
-
-    <section class="timeline__tools">
+    <section class="border-t border-slate-200 pt-4 dark:border-slate-700">
       <MiniCalendar
         :model-value="miniDate"
         @update:model-value="(d) => (miniDate = d)"
@@ -116,213 +129,100 @@ function formatDate(date: Date | null): string {
       />
     </section>
 
-    <section class="timeline__calendars">
-      <h3>Calendars</h3>
-      <ul class="cal-list">
-        <li v-for="g in calendar.groupings" :key="g.key" class="cal-item">
-          <label class="cal-row">
+    <section class="space-y-3 border-t border-slate-200 pt-4 dark:border-slate-700">
+      <div class="flex items-center justify-between gap-2">
+        <h3 class="text-base font-semibold text-slate-900 dark:text-white">Layers</h3>
+        <div class="relative">
+          <button
+            type="button"
+            class="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 text-slate-600 transition hover:bg-slate-100 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800/70"
+            :aria-pressed="quickAddOpen"
+            :disabled="isCreatingLayer"
+            ref="quickAddButtonRef"
+            @click="handleQuickAddToggle"
+          >
+            <span aria-hidden="true">+</span>
+            <span class="sr-only">
+              {{ quickAddOpen ? 'Hide layer form' : 'Show layer form' }}
+            </span>
+          </button>
+
+          <Popover
+            ref="quickAddPopover"
+            :dismissable="!isCreatingLayer"
+            :show-close-icon="false"
+            :focus-on-show="false"
+            :pt="popoverPt"
+            @hide="handlePopoverHide"
+          >
+            <div role="dialog" aria-label="Quick add layer">
+              <LayerQuickAddForm
+                :key="formInstanceKey"
+                :submitting="isCreatingLayer"
+                :error-message="layerError"
+                @submit="handleLayerSubmit"
+                @cancel="handlePopoverHide"
+              />
+            </div>
+          </Popover>
+        </div>
+      </div>
+      <ul class="space-y-2">
+        <li
+          v-for="layer in calendar.layers"
+          :key="layer.key"
+          class="rounded-2xl border border-slate-200 bg-white/80 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-800/60"
+        >
+          <label class="grid grid-cols-[auto_auto_1fr_auto] items-center gap-3">
             <input
               type="checkbox"
-              :checked="store.visibleGroupingKeys.includes(g.key)"
-              @change="store.setGroupingVisibility(g.key, ($event.target as HTMLInputElement).checked)"
+              :checked="store.visibleLayerKeys.includes(layer.key)"
+              class="h-4 w-4 rounded border-slate-300 text-brand focus:ring-brand dark:border-slate-600"
+              @change="store.setLayerVisibility(layer.key, ($event.target as HTMLInputElement).checked)"
             />
-            <span class="swatch" :style="{ backgroundColor: g.color || '#64748b' }" />
-            <span class="cal-name">{{ g.name }}</span>
+            <span
+              class="h-3.5 w-3.5 rounded border border-slate-200 dark:border-slate-600"
+              :style="{ backgroundColor: layer.color || '#64748b' }"
+            />
+            <span class="font-medium text-slate-700 dark:text-slate-200">{{ layer.name }}</span>
             <input
-              class="color"
+              class="h-5 w-10 cursor-pointer rounded border border-slate-200 bg-transparent p-0 dark:border-slate-600"
               type="color"
-              :value="g.color || '#64748b'"
+              :value="layer.color || '#64748b'"
               title="Color"
-              @input="(e) => { const v = (e.target as HTMLInputElement).value; store.updateGroupingColor(g.key, v); store.schedulePersistGroupingColor(g.key, v, 1200) }"
-              @change="(e) => { const v = (e.target as HTMLInputElement).value; store.persistGroupingColor(g.key, v) }"
+              @input="(e) => { const v = (e.target as HTMLInputElement).value; store.updateLayerColor(layer.key, v); store.schedulePersistLayerColor(layer.key, v, 1200) }"
+              @change="(e) => { const v = (e.target as HTMLInputElement).value; store.persistLayerColor(layer.key, v) }"
             />
           </label>
         </li>
       </ul>
     </section>
 
-    <section class="timeline__upcoming">
-      <h3>Upcoming lessons</h3>
-      <ul>
+    <section class="space-y-3 border-t border-slate-200 pt-4 dark:border-slate-700">
+      <h3 class="text-base font-semibold text-slate-900 dark:text-white">Upcoming items</h3>
+      <ul class="space-y-2">
         <li
-          v-for="day in upcomingDays"
-          :key="day.id"
+          v-for="item in upcomingItems"
+          :key="item.id"
         >
           <button
             type="button"
-            class="upcoming-day"
-            :class="{ active: selectedDayId === day.id }"
-            @click="emit('select-day', day.id)"
+            class="grid w-full grid-cols-[1fr_auto_auto] items-center gap-3 rounded-xl border border-transparent bg-slate-100 px-3 py-2 text-left text-sm text-slate-700 transition hover:border-slate-200 hover:bg-slate-50 dark:bg-slate-800/60 dark:text-slate-200"
+            :class="{ 'border-blue-500 bg-blue-50 text-blue-700 dark:border-blue-400 dark:bg-blue-500/20 dark:text-blue-100': selectedDayId === item.id }"
+            @click="emit('select-day', item.id)"
           >
-            <span class="day-label">{{ day.label }}</span>
-            <span class="day-date">{{ formatDate(new Date(day.date)) }}</span>
-            <span class="chip">{{ day.groupingKey }}</span>
+            <span class="font-semibold">{{ item.title }}</span>
+            <span class="text-xs text-slate-500 dark:text-slate-400">{{ formatDate(new Date(item.date)) }}</span>
+            <span class="rounded-full bg-blue-50 px-2 py-0.5 text-[0.65rem] font-semibold uppercase tracking-wider text-blue-600 dark:bg-blue-500/20 dark:text-blue-100">
+              {{ item.layerKey }}
+            </span>
           </button>
         </li>
       </ul>
-      <p v-if="upcomingDays.length === 0" class="empty">
-        You're ahead of schedule! No remaining lessons scheduled.
+      <p v-if="upcomingItems.length === 0" class="text-center text-sm text-slate-500 dark:text-slate-400">
+        You're ahead of schedule! No remaining items scheduled.
       </p>
     </section>
   </aside>
 </template>
-
-<style scoped>
-.timeline {
-  display: flex;
-  flex-direction: column;
-  gap: 1.25rem;
-  padding: 1.25rem;
-  border-radius: 1rem;
-  border: 1px solid var(--color-border);
-  background: var(--color-background-soft);
-}
-
-.timeline__header h2 {
-  font-size: 1.15rem;
-  margin-bottom: 0.25rem;
-}
-
-.timeline__meta {
-  font-size: 0.9rem;
-  color: var(--color-text);
-  opacity: 0.75;
-}
-
-.timeline__stats {
-  display: grid;
-  gap: 0.75rem;
-}
-
-.stat-card {
-  display: flex;
-  flex-direction: column;
-  gap: 0.25rem;
-  padding: 0.75rem;
-  border-radius: 0.75rem;
-  background: rgba(37, 99, 235, 0.12);
-}
-
-.stat-label {
-  font-size: 0.75rem;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: var(--color-text);
-  opacity: 0.75;
-}
-
-.stat-card strong {
-  font-size: 1rem;
-}
-
-.timeline__progress {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-}
-
-.progress-bar {
-  height: 0.65rem;
-  border-radius: 999px;
-  background: rgba(37, 99, 235, 0.1);
-  overflow: hidden;
-}
-
-.progress-bar__value {
-  height: 100%;
-  background: linear-gradient(135deg, #2563eb, #1d4ed8);
-  transition: width 0.3s ease;
-}
-
-.progress-label {
-  font-size: 0.85rem;
-  color: var(--color-text);
-  opacity: 0.85;
-}
-
-.timeline__upcoming ul {
-  list-style: none;
-  padding: 0;
-  margin: 0;
-  display: grid;
-  gap: 0.5rem;
-}
-
-.timeline__tools {
-  border-top: 1px solid var(--color-border);
-  padding-top: 0.75rem;
-}
-
-.timeline__calendars {
-  border-top: 1px solid var(--color-border);
-  padding-top: 0.75rem;
-  display: grid;
-  gap: 0.5rem;
-}
-.cal-list { list-style: none; padding: 0; margin: 0; display: grid; gap: 0.4rem; }
-.cal-item {}
-.cal-row { display: grid; grid-template-columns: auto auto 1fr auto; gap: 0.5rem; align-items: center; }
-.swatch { width: 0.8rem; height: 0.8rem; border-radius: 2px; border: 1px solid var(--color-border); }
-.color { inline-size: 2rem; block-size: 1.2rem; padding: 0; border: none; background: transparent; }
-
-.upcoming-day {
-  width: 100%;
-  display: grid;
-  grid-template-columns: 1fr auto auto;
-  align-items: center;
-  gap: 0.75rem;
-  padding: 0.65rem 0.75rem;
-  border-radius: 0.75rem;
-  border: 1px solid transparent;
-  background: var(--color-background-mute);
-  cursor: pointer;
-  transition: border-color 0.2s ease, background-color 0.2s ease;
-}
-
-.upcoming-day:hover {
-  border-color: rgba(37, 99, 235, 0.35);
-  background: rgba(37, 99, 235, 0.12);
-}
-
-.upcoming-day.active {
-  border-color: rgba(37, 99, 235, 0.6);
-  background: rgba(37, 99, 235, 0.2);
-}
-
-.day-label {
-  font-weight: 600;
-  font-size: 0.95rem;
-  text-align: left;
-}
-
-.day-date {
-  font-size: 0.85rem;
-  color: var(--color-text);
-  opacity: 0.85;
-}
-
-.chip {
-  font-size: 0.75rem;
-  background: rgba(37, 99, 235, 0.12);
-  color: #1d4ed8;
-  padding: 0.2rem 0.55rem;
-  border-radius: 999px;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-}
-
-.empty {
-  font-size: 0.85rem;
-  color: var(--color-text);
-  opacity: 0.75;
-  margin-top: 0.75rem;
-  text-align: center;
-}
-
-@media (max-width: 640px) {
-  .timeline {
-    padding: 1rem;
-  }
-}
-</style>
 

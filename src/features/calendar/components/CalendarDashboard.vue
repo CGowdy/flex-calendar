@@ -1,4 +1,8 @@
 <script setup lang="ts">
+// ADR-Lite
+// Context: Calendar creation forced everyone through the setup wizard modal.
+// Decision: Default to an inline quick-add form with an optional wizard entry point.
+// Consequences: Experienced users create calendars faster while the guided flow remains available.
 import { computed, onMounted, ref, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 
@@ -12,7 +16,7 @@ import DayCalendar from './DayCalendar.vue'
 import type {
   Calendar,
   CreateCalendarRequest,
-  ShiftCalendarDaysRequest,
+  ShiftScheduledItemsRequest,
 } from '@/features/calendar/types/calendar'
 
 const calendarStore = useCalendarStore()
@@ -22,10 +26,17 @@ const {
   activeCalendarId,
   isLoading,
   errorMessage,
-  visibleGroupingKeys,
+  visibleLayerKeys,
 } = storeToRefs(calendarStore)
 
+const CREATE_CALENDAR_OPTION = '__create__'
+
 const showSetupWizard = ref(false)
+const showQuickAdd = ref(false)
+const showInlineCreate = ref(false)
+const inlineCalendarName = ref('')
+const inlineCalendarError = ref<string | null>(null)
+
 const selectedDayId = ref<string | null>(null)
 const isSubmitting = ref(false)
 const shiftInProgress = ref(false)
@@ -48,10 +59,21 @@ onMounted(async () => {
     if (firstCalendar) {
       await calendarStore.loadCalendar(firstCalendar.id)
     }
+    showQuickAdd.value = false
   } else {
-    showSetupWizard.value = true
+    showQuickAdd.value = true
   }
 })
+
+watch(
+  calendars,
+  (next) => {
+    if (next.length === 0) {
+      showQuickAdd.value = true
+    }
+  },
+  { immediate: true }
+)
 
 watch(
   selectedCalendar,
@@ -61,17 +83,19 @@ watch(
       return
     }
 
-    const stillExists = calendar.days.some(
-      (day) => day.id === selectedDayId.value
+    const stillExists = calendar.scheduledItems.some(
+      (item) => item.id === selectedDayId.value
     )
     if (!stillExists) {
-      selectedDayId.value = calendar.days[0]?.id ?? null
+      selectedDayId.value = calendar.scheduledItems[0]?.id ?? null
     }
   },
   { immediate: true }
 )
 
 function openSetupWizard() {
+  showQuickAdd.value = false
+  showInlineCreate.value = false
   showSetupWizard.value = true
 }
 
@@ -81,9 +105,35 @@ function closeSetupWizard() {
   }
 }
 
+function openQuickAdd() {
+  showSetupWizard.value = false
+  showInlineCreate.value = false
+  showQuickAdd.value = true
+}
+
+function closeQuickAdd() {
+  if (!isSubmitting.value) {
+    showQuickAdd.value = false
+  }
+}
+
 async function handleCalendarChange(event: Event) {
   const target = event.target as HTMLSelectElement
   const nextId = target.value
+  if (nextId === CREATE_CALENDAR_OPTION) {
+    showSetupWizard.value = false
+    showQuickAdd.value = false
+    inlineCalendarName.value = ''
+    inlineCalendarError.value = null
+    showInlineCreate.value = true
+    target.value = activeCalendarId.value ?? ''
+    return
+  }
+
+  showInlineCreate.value = false
+  inlineCalendarError.value = null
+  inlineCalendarName.value = ''
+
   if (!nextId) {
     calendarStore.selectCalendar(null)
     return
@@ -91,35 +141,80 @@ async function handleCalendarChange(event: Event) {
   await calendarStore.loadCalendar(nextId)
 }
 
-async function handleSetupSubmit(payload: CreateCalendarRequest) {
+function cancelInlineCreate() {
+  if (isSubmitting.value) {
+    return
+  }
+  showInlineCreate.value = false
+  inlineCalendarName.value = ''
+  inlineCalendarError.value = null
+}
+
+async function handleInlineCreateSubmit() {
+  const name = inlineCalendarName.value.trim()
+  if (name.length === 0) {
+    inlineCalendarError.value = 'Name is required'
+    return
+  }
+
+  inlineCalendarError.value = null
   isSubmitting.value = true
   try {
-    const calendar = await calendarStore.createCalendarAndSelect(payload)
-    showSetupWizard.value = false
-    selectedDayId.value = calendar.days[0]?.id ?? null
+    const calendar = await calendarStore.createCalendarAndSelect({
+      name,
+      layers: [],
+    })
+    selectedDayId.value = calendar.scheduledItems[0]?.id ?? null
+    showInlineCreate.value = false
+    showQuickAdd.value = false
+  } catch (error) {
+    inlineCalendarError.value =
+      error instanceof Error ? error.message : 'Failed to create calendar'
   } finally {
     isSubmitting.value = false
   }
 }
 
-function handleSelectDay(dayId: string) {
-  selectedDayId.value = dayId
+async function handleSetupSubmit(payload: CreateCalendarRequest) {
+  isSubmitting.value = true
+  try {
+    const calendar = await calendarStore.createCalendarAndSelect(payload)
+    showSetupWizard.value = false
+    selectedDayId.value = calendar.scheduledItems[0]?.id ?? null
+  } finally {
+    isSubmitting.value = false
+  }
 }
 
-async function handleShiftCalendar(payload: ShiftCalendarDaysRequest) {
+async function handleQuickAddSubmit(payload: CreateCalendarRequest) {
+  isSubmitting.value = true
+  try {
+    const calendar = await calendarStore.createCalendarAndSelect(payload)
+    showQuickAdd.value = false
+    selectedDayId.value = calendar.scheduledItems[0]?.id ?? null
+  } finally {
+    isSubmitting.value = false
+  }
+}
+
+function handleSelectDay(scheduledItemId: string) {
+  selectedDayId.value = scheduledItemId
+}
+
+async function handleShiftCalendar(payload: ShiftScheduledItemsRequest) {
   if (!selectedCalendar.value) {
     return
   }
 
   shiftInProgress.value = true
   try {
-    const updated = await calendarStore.shiftCalendarDay(payload)
+    const updated = await calendarStore.shiftScheduledItem(payload)
     if (updated && selectedDayId.value) {
-      const stillExists = updated.days.some(
-        (day) => day.id === selectedDayId.value
+      const stillExists = updated.scheduledItems.some(
+        (item) => item.id === selectedDayId.value
       )
       if (!stillExists) {
-        selectedDayId.value = updated.days[0]?.id ?? null
+        selectedDayId.value = updated.scheduledItems[0]?.id ?? null
       }
     }
   } finally {
@@ -130,19 +225,18 @@ async function handleShiftCalendar(payload: ShiftCalendarDaysRequest) {
 </script>
 
 <template>
-  <div class="dashboard">
-    <section class="dashboard__header">
+  <div class="flex w-full flex-col gap-6">
+    <section class="flex flex-wrap items-center justify-between gap-4">
       <div>
-        <h1>Academic Planner</h1>
-        <p class="dashboard__subtitle">
-          Adjust lessons, track make-up days, and stay aligned with Abeka's
-          pacing.
+        <h1 class="text-2xl font-semibold text-slate-900 dark:text-white">Flex Calendar</h1>
+        <p class="mt-1 max-w-2xl text-base text-slate-600 dark:text-slate-300">
+          Adjust chainable schedules, track exceptions, and keep every layer in sync.
         </p>
       </div>
-      <div class="dashboard__actions">
+      <div class="flex flex-wrap items-center gap-3">
         <select
           v-if="hasCalendars"
-          class="calendar-select"
+          class="min-w-[220px] rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
           :value="activeCalendarId ?? ''"
           :disabled="isBusy"
           @change="handleCalendarChange"
@@ -155,28 +249,93 @@ async function handleShiftCalendar(payload: ShiftCalendarDaysRequest) {
           >
             {{ calendar.name }}
           </option>
+          <option :value="CREATE_CALENDAR_OPTION">
+            + Create new calendar…
+          </option>
         </select>
 
         <button
           type="button"
-          class="primary-button"
+          class="inline-flex items-center rounded-xl border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800/70"
           :disabled="isBusy"
           @click="openSetupWizard"
         >
-          New Calendar
+          Use Setup Wizard
         </button>
       </div>
     </section>
 
+    <section
+      v-if="showInlineCreate"
+      class="rounded-2xl border border-slate-200/80 bg-white/95 p-5 shadow-sm dark:border-slate-700/70 dark:bg-slate-900"
+    >
+      <form
+        class="flex w-full max-w-md flex-col gap-4"
+        @submit.prevent="handleInlineCreateSubmit"
+      >
+        <label class="flex flex-col gap-2 text-sm font-semibold text-slate-600 dark:text-slate-200">
+          <span>Calendar name</span>
+          <input
+            v-model="inlineCalendarName"
+            type="text"
+            :disabled="isSubmitting"
+            placeholder="Roadmap 2025"
+            aria-label="New calendar name"
+            class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-base text-slate-900 shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+          />
+        </label>
+
+        <div class="flex flex-wrap justify-end gap-3">
+          <button
+            type="button"
+            class="inline-flex items-center rounded-xl border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800/70"
+            :disabled="isSubmitting"
+            @click="cancelInlineCreate"
+          >
+            Cancel
+          </button>
+          <button
+            type="submit"
+            class="inline-flex items-center rounded-xl bg-gradient-to-r from-blue-600 to-indigo-500 px-4 py-2 font-semibold text-white shadow-md transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-60"
+            :disabled="isSubmitting || inlineCalendarName.trim().length === 0"
+          >
+            <span v-if="isSubmitting">Creating…</span>
+            <span v-else>Create calendar</span>
+          </button>
+        </div>
+
+        <p
+          v-if="inlineCalendarError"
+          class="text-sm text-[#b91c1c]"
+        >
+          {{ inlineCalendarError }}
+        </p>
+      </form>
+    </section>
+
+    <section
+      v-if="showQuickAdd && !hasCalendars"
+      class="rounded-2xl border border-slate-200/80 bg-white/95 p-4 shadow-sm dark:border-slate-700/70 dark:bg-slate-900"
+    >
+      <CalendarQuickAddForm
+        :submitting="isSubmitting"
+        @submit="handleQuickAddSubmit"
+        @cancel="closeQuickAdd"
+      />
+    </section>
+
     <div
       v-if="errorMessage"
-      class="alert"
+      class="rounded-xl border border-red-200/50 bg-red-100/60 px-4 py-3 text-red-700"
       role="alert"
     >
       {{ errorMessage }}
     </div>
 
-    <section v-if="selectedCalendar" class="dashboard__content">
+    <section
+      v-if="selectedCalendar"
+      class="grid gap-6 items-start lg:grid-cols-[minmax(260px,320px)_1fr]"
+    >
       <CalendarTimeline
         :calendar="selectedCalendar"
         :selected-day-id="selectedDayId"
@@ -186,36 +345,36 @@ async function handleShiftCalendar(payload: ShiftCalendarDaysRequest) {
         @select-day="handleSelectDay"
       />
 
-      <div class="content-right">
-        <div class="view-toggle">
+      <div class="flex flex-col gap-3">
+        <div class="inline-flex gap-2">
           <button
             type="button"
-            class="toggle"
-            :class="{ active: viewMode === 'month' }"
+            class="rounded-lg border border-slate-200 bg-white px-3 py-1 text-sm text-slate-600 transition hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800/70"
+            :class="{ 'border-blue-500 bg-blue-50 text-blue-700 dark:border-blue-400 dark:bg-blue-500/20 dark:text-blue-100': viewMode === 'month' }"
             @click="viewMode = 'month'"
           >
             Month
           </button>
           <button
             type="button"
-            class="toggle"
-            :class="{ active: viewMode === 'week' }"
+            class="rounded-lg border border-slate-200 bg-white px-3 py-1 text-sm text-slate-600 transition hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800/70"
+            :class="{ 'border-blue-500 bg-blue-50 text-blue-700 dark:border-blue-400 dark:bg-blue-500/20 dark:text-blue-100': viewMode === 'week' }"
             @click="viewMode = 'week'"
           >
             Week
           </button>
           <button
             type="button"
-            class="toggle"
-            :class="{ active: viewMode === 'day' }"
+            class="rounded-lg border border-slate-200 bg-white px-3 py-1 text-sm text-slate-600 transition hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800/70"
+            :class="{ 'border-blue-500 bg-blue-50 text-blue-700 dark:border-blue-400 dark:bg-blue-500/20 dark:text-blue-100': viewMode === 'day' }"
             @click="viewMode = 'day'"
           >
             Day
           </button>
           <button
             type="button"
-            class="toggle"
-            :class="{ active: viewMode === 'board' }"
+            class="rounded-lg border border-slate-200 bg-white px-3 py-1 text-sm text-slate-600 transition hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800/70"
+            :class="{ 'border-blue-500 bg-blue-50 text-blue-700 dark:border-blue-400 dark:bg-blue-500/20 dark:text-blue-100': viewMode === 'board' }"
             @click="viewMode = 'board'"
           >
             Board
@@ -227,7 +386,7 @@ async function handleShiftCalendar(payload: ShiftCalendarDaysRequest) {
           :calendar="selectedCalendar"
           :selected-day-id="selectedDayId"
           :view-date="viewDate"
-          :visible-grouping-keys="visibleGroupingKeys"
+          :visible-layer-keys="visibleLayerKeys"
           @select-day="handleSelectDay"
           @shift-day="handleShiftCalendar"
           @update:viewDate="(d: Date) => viewDate = d"
@@ -237,7 +396,7 @@ async function handleShiftCalendar(payload: ShiftCalendarDaysRequest) {
           v-else-if="viewMode === 'week'"
           :calendar="selectedCalendar"
           :selected-day-id="selectedDayId"
-          :visible-grouping-keys="visibleGroupingKeys"
+          :visible-layer-keys="visibleLayerKeys"
           @select-day="handleSelectDay"
         />
 
@@ -252,6 +411,7 @@ async function handleShiftCalendar(payload: ShiftCalendarDaysRequest) {
           v-else
           :calendar="selectedCalendar"
           :selected-day-id="selectedDayId"
+          :visible-layer-keys="visibleLayerKeys"
           :disabled="isBusy"
           @select-day="handleSelectDay"
           @shift-day="handleShiftCalendar"
@@ -259,20 +419,43 @@ async function handleShiftCalendar(payload: ShiftCalendarDaysRequest) {
       </div>
     </section>
 
-    <section v-else-if="!isLoading" class="empty-state">
-      <p>Start by creating your first calendar to import Abeka lessons.</p>
-      <button
-        type="button"
-        class="primary-button"
-        :disabled="isBusy"
-        @click="openSetupWizard"
-      >
-        Launch Setup Wizard
-      </button>
+    <section
+      v-else-if="!isLoading"
+      class="flex flex-col items-center justify-center gap-4 rounded-2xl border border-dashed border-slate-300 bg-slate-50/60 p-12 text-center text-slate-600 dark:border-slate-600 dark:bg-slate-900/60 dark:text-slate-300"
+    >
+      <p>
+        Start by creating your first calendar. Use quick add for defaults or the
+        setup wizard if you want the guided experience.
+      </p>
+      <div class="flex flex-wrap justify-center gap-3">
+        <button
+          type="button"
+          class="inline-flex items-center rounded-xl bg-gradient-to-r from-blue-600 to-indigo-500 px-4 py-2 font-semibold text-white shadow-md transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-60"
+          :disabled="isBusy"
+          @click="openQuickAdd"
+        >
+          Open Quick Add
+        </button>
+        <button
+          type="button"
+          class="inline-flex items-center rounded-xl border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800/70"
+          :disabled="isBusy"
+          @click="openSetupWizard"
+        >
+          Use Setup Wizard
+        </button>
+      </div>
     </section>
 
-    <div v-if="isBusy" class="loading-indicator" role="status">
-      <span class="spinner" aria-hidden="true" />
+    <div
+      v-if="isBusy"
+      class="fixed bottom-6 right-6 flex items-center gap-3 rounded-full bg-slate-900/90 px-4 py-2 text-sm text-white shadow-2xl"
+      role="status"
+    >
+      <span
+        class="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white"
+        aria-hidden="true"
+      />
       <span>Syncing updates…</span>
     </div>
 
@@ -285,169 +468,4 @@ async function handleShiftCalendar(payload: ShiftCalendarDaysRequest) {
 
   </div>
 </template>
-
-<style scoped>
-.dashboard {
-  display: flex;
-  flex-direction: column;
-  gap: 1.5rem;
-  width: 100%;
-}
-
-.dashboard__header {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
-}
-
-.dashboard__subtitle {
-  color: var(--color-text);
-  opacity: 0.75;
-  max-width: 640px;
-  margin-top: 0.25rem;
-}
-
-.dashboard__actions {
-  display: flex;
-  gap: 0.75rem;
-  align-items: center;
-}
-
-.calendar-select {
-  min-width: 220px;
-  padding: 0.5rem 0.75rem;
-  border-radius: 0.5rem;
-  border: 1px solid var(--color-border);
-  background: var(--color-background);
-}
-
-.primary-button {
-  background: linear-gradient(135deg, #2563eb, #1d4ed8);
-  color: #fff;
-  padding: 0.55rem 1.25rem;
-  border-radius: 0.75rem;
-  border: none;
-  cursor: pointer;
-  font-weight: 600;
-  box-shadow: 0 12px 24px -12px rgba(37, 99, 235, 0.6);
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
-}
-
-.primary-button:disabled {
-  cursor: not-allowed;
-  opacity: 0.6;
-  box-shadow: none;
-}
-
-.primary-button:not(:disabled):hover {
-  transform: translateY(-1px);
-  box-shadow: 0 16px 28px -14px rgba(37, 99, 235, 0.6);
-}
-
-.alert {
-  padding: 0.75rem 1rem;
-  border-radius: 0.75rem;
-  border: 1px solid rgba(220, 38, 38, 0.2);
-  background: rgba(254, 226, 226, 0.65);
-  color: #b91c1c;
-}
-
-.dashboard__content {
-  display: grid;
-  grid-template-columns: minmax(260px, 320px) 1fr;
-  gap: 1.5rem;
-  align-items: start;
-}
-
-.content-right {
-  display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
-}
-
-.view-toggle {
-  display: inline-flex;
-  gap: 0.25rem;
-}
-
-.toggle {
-  border: 1px solid var(--color-border);
-  background: var(--color-background);
-  color: var(--color-text);
-  padding: 0.35rem 0.6rem;
-  border-radius: 0.5rem;
-  cursor: pointer;
-}
-
-.toggle.active {
-  border-color: rgba(37, 99, 235, 0.5);
-  background: rgba(37, 99, 235, 0.15);
-}
-
-.empty-state {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 1rem;
-  padding: 3rem;
-  border: 1px dashed var(--color-border);
-  border-radius: 1rem;
-  background: var(--color-background-soft);
-  text-align: center;
-}
-
-.loading-indicator {
-  position: fixed;
-  bottom: 1.5rem;
-  right: 1.5rem;
-  background: rgba(15, 23, 42, 0.9);
-  color: #fff;
-  padding: 0.75rem 1rem;
-  border-radius: 9999px;
-  display: flex;
-  gap: 0.75rem;
-  align-items: center;
-  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.4);
-}
-
-.spinner {
-  width: 1rem;
-  height: 1rem;
-  border-radius: 50%;
-  border: 2px solid rgba(255, 255, 255, 0.35);
-  border-top-color: #fff;
-  animation: spin 1s linear infinite;
-}
-
-@keyframes spin {
-  to {
-    transform: rotate(360deg);
-  }
-}
-
-@media (max-width: 1024px) {
-  .dashboard__content {
-    grid-template-columns: 1fr;
-  }
-}
-
-@media (max-width: 640px) {
-    .dashboard__header {
-      flex-direction: column;
-      align-items: flex-start;
-    }
-
-    .dashboard__actions {
-      width: 100%;
-      justify-content: flex-start;
-    }
-
-    .calendar-select {
-      flex: 1;
-    }
-}
-</style>
 

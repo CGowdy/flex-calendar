@@ -28,7 +28,7 @@ services:
       - PORT=${PORT:-3333}
       - HOST=0.0.0.0
       # Ensure MONGODB_URI is provided in .env; example:
-      # MONGODB_URI=mongodb://root:example@mongo:27017/my-abeka-calendar?authMechanism=DEFAULT
+      # MONGODB_URI=mongodb://root:example@mongo:27017/flex-calendar?authMechanism=DEFAULT
     depends_on:
       - mongo
     networks: [webnet]

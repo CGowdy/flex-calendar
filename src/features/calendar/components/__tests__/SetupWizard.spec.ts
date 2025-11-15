@@ -3,9 +3,10 @@ import userEvent from '@testing-library/user-event'
 import { describe, expect, it } from 'vitest'
 
 import SetupWizard from '../SetupWizard.vue'
+import type { CreateCalendarRequest } from '../../types/calendar'
 
 describe('SetupWizard', () => {
-  it('emits create payload with selected groupings', async () => {
+  it('emits create payload with selected layers', async () => {
     const user = userEvent.setup()
     const { emitted } = render(SetupWizard)
 
@@ -13,24 +14,17 @@ describe('SetupWizard', () => {
     await user.clear(nameField)
     await user.type(nameField, 'Family Plan')
 
-    const totalDaysField = screen.getByLabelText(/total instructional days/i)
-    await user.clear(totalDaysField)
-    await user.type(totalDaysField, '180')
+    // Enable the additional layer
+    const additionalCard = screen
+      .getByText('Additional Layer', { selector: 'span' })
+      .closest('li')
+    expect(additionalCard).not.toBeNull()
+    const additionalChecks = within(additionalCard as HTMLElement).getAllByRole('checkbox') as HTMLInputElement[]
+    await user.click(additionalChecks[0]!)
 
-    // Enable Student B grouping
-    const studentBCard = screen.getByText('Student B', { selector: 'span' }).closest('li')
-    expect(studentBCard).not.toBeNull()
-    const studentChecks = within(studentBCard as HTMLElement).getAllByRole('checkbox') as HTMLElement[]
-    await user.click(studentChecks[0]!)
-
-    // Disable auto-shift for holidays explicitly
-    const holidayCard = screen.getByText('Holidays / Breaks', { selector: 'span' }).closest('li')
-    expect(holidayCard).not.toBeNull()
-    const holidayChecks = within(holidayCard as HTMLElement).getAllByRole('checkbox') as HTMLElement[]
-    const holidayAutoShift = holidayChecks[1] as HTMLInputElement
-    if (holidayAutoShift.checked) {
-      await user.click(holidayAutoShift)
-    }
+    const itemCountInput = within(additionalCard as HTMLElement).getByLabelText(/items to generate/i)
+    await user.clear(itemCountInput)
+    await user.type(itemCountInput, '90')
 
     const submitButton = screen.getByRole('button', { name: /save calendar/i })
     await user.click(submitButton)
@@ -41,18 +35,22 @@ describe('SetupWizard', () => {
       throw new Error('expected submit events')
     }
     const first = submitEvents[0] as unknown[]
-    const payload = first[0] as {
-      name: string
-      totalDays: number
-      groupings: Array<{ key: string; autoShift: boolean }>
-    }
+    const payload = first[0] as CreateCalendarRequest
     expect(payload.name).toBe('Family Plan')
-    expect(payload.totalDays).toBe(180)
-    expect(payload.groupings).toEqual(
+    expect(payload.layers).toEqual(
       expect.arrayContaining([
-        expect.objectContaining({ key: 'abeka', autoShift: true }),
-        expect.objectContaining({ key: 'student-b', autoShift: true }),
-        expect.objectContaining({ key: 'holidays', autoShift: false }),
+        expect.objectContaining({
+          key: 'reference',
+          templateConfig: expect.objectContaining({ mode: 'generated', itemCount: 180 }),
+        }),
+        expect.objectContaining({
+          key: 'progress-b',
+          templateConfig: expect.objectContaining({ mode: 'generated', itemCount: 90 }),
+        }),
+        expect.objectContaining({
+          key: 'exceptions',
+          templateConfig: expect.objectContaining({ mode: 'manual' }),
+        }),
       ])
     )
   })

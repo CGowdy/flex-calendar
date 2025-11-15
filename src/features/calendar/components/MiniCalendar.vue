@@ -48,25 +48,53 @@ const monthLabel = computed(() =>
 </script>
 
 <template>
-  <section class="mini">
-    <header class="mini__header">
-      <button class="nav" @click="prev" aria-label="Prev">‹</button>
-      <strong>{{ monthLabel }}</strong>
-      <button class="nav" @click="next" aria-label="Next">›</button>
+  <section class="rounded-2xl border border-slate-200/80 bg-white/95 p-4 shadow-sm dark:border-slate-700/70 dark:bg-slate-900">
+    <header class="mb-2 flex items-center justify-between gap-2 text-sm font-semibold text-slate-700 dark:text-slate-100">
+      <button
+        type="button"
+        class="inline-flex h-7 w-7 items-center justify-center rounded-md border border-slate-200 text-slate-500 transition hover:bg-slate-100 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
+        @click="prev"
+        aria-label="Previous month"
+      >
+        ‹
+      </button>
+      <strong class="text-sm font-semibold">{{ monthLabel }}</strong>
+      <button
+        type="button"
+        class="inline-flex h-7 w-7 items-center justify-center rounded-md border border-slate-200 text-slate-500 transition hover:bg-slate-100 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
+        @click="next"
+        aria-label="Next month"
+      >
+        ›
+      </button>
     </header>
 
-    <div class="mini__grid">
-      <div class="wday" v-for="d in ['S','M','T','W','T','F','S']" :key="d">{{ d }}</div>
+    <div class="grid grid-cols-7 gap-1 text-xs font-medium">
+      <div
+        v-for="d in ['S','M','T','W','T','F','S']"
+        :key="d"
+        class="text-center text-[0.65rem] uppercase tracking-wide text-slate-400 dark:text-slate-500"
+      >
+        {{ d }}
+      </div>
+
       <template v-for="(row, ri) in weeks" :key="ri">
         <button
           v-for="d in row"
           :key="d.toISOString()"
-          class="cell"
-          :class="{
-            'muted': d.getMonth() !== modelValue.getMonth(),
-            'today': sameDay(d, today),
-            'selected': sameDay(d, modelValue),
-          }"
+          type="button"
+          class="rounded-md border px-1.5 py-1 text-xs font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
+          :class="[
+            d.getMonth() !== modelValue.getMonth()
+              ? 'text-slate-400 dark:text-slate-500'
+              : 'text-slate-700 dark:text-slate-100',
+            sameDay(d, today)
+              ? 'ring-1 ring-blue-400/60 dark:ring-blue-300/50'
+              : 'ring-transparent',
+            sameDay(d, modelValue)
+              ? 'border-blue-400 bg-blue-50 text-blue-700 dark:border-blue-500 dark:bg-blue-500/20 dark:text-blue-100'
+              : 'border-transparent hover:border-slate-200 dark:hover:border-slate-700'
+          ]"
           @click="selectDate(d)"
         >
           {{ d.getDate() }}
@@ -75,40 +103,5 @@ const monthLabel = computed(() =>
     </div>
   </section>
 </template>
-
-<style scoped>
-.mini { display: grid; gap: 0.5rem; }
-.mini__header { display: flex; justify-content: space-between; align-items: center; }
-.nav {
-  border: 1px solid var(--color-border);
-  background: var(--color-background);
-  color: var(--color-text);
-  padding: 0.1rem 0.4rem;
-  border-radius: 0.4rem;
-}
-.mini__grid {
-  display: grid;
-  grid-template-columns: repeat(7, 1fr);
-  gap: 2px;
-}
-.wday {
-  text-align: center;
-  font-size: 0.7rem;
-  color: var(--color-text);
-  opacity: 0.7;
-}
-.cell {
-  border: 1px solid var(--color-border);
-  background: var(--color-background);
-  color: var(--color-text);
-  border-radius: 0.35rem;
-  padding: 0.25rem 0;
-  font-size: 0.8rem;
-  cursor: pointer;
-}
-.cell.muted { opacity: 0.6; }
-.cell.today { outline: 2px solid rgba(37,99,235,0.6); outline-offset: -2px; }
-.cell.selected { background: rgba(37,99,235,0.15); border-color: rgba(37,99,235,0.5); }
-</style>
 
 

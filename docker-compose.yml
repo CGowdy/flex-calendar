@@ -19,7 +19,7 @@ services:
       NODE_ENV: development
       PORT: '3333'
       HOST: 0.0.0.0
-      MONGODB_URI: mongodb://mongo:27017/my-abeka-calendar
+      MONGODB_URI: mongodb://mongo:27017/flex-calendar
       CORS_ORIGIN: http://localhost:5173
     volumes:
       - .:/app

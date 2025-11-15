@@ -1,8 +1,8 @@
 import type {
   Calendar,
-  CalendarDay,
-  CalendarGrouping,
-  ShiftCalendarDaysRequest,
+  ScheduledItem,
+  CalendarLayer,
+  ShiftScheduledItemsRequest,
 } from '../types/calendar'
 
 function addDays(date: Date, days: number): Date {
@@ -21,14 +21,23 @@ function normalizeDate(date: Date): string {
   return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}-${String(d.getUTCDate()).padStart(2, '0')}`
 }
 
-function getHolidayDates(days: CalendarDay[]): Set<string> {
-  const holidaySet = new Set<string>()
-  for (const day of days) {
-    if (day.groupingKey === 'holidays') {
-      holidaySet.add(normalizeDate(new Date(day.date)))
+function getExceptionLayerKeys(layers: CalendarLayer[]): Set<string> {
+  return new Set(
+    layers
+      .filter((layer) => layer.kind === 'exception' || layer.key === 'exceptions')
+      .map((layer) => layer.key)
+  )
+}
+
+function getExceptionDates(calendar: Calendar): Set<string> {
+  const exceptionLayerKeys = getExceptionLayerKeys(calendar.layers)
+  const exceptionSet = new Set<string>()
+  for (const item of calendar.scheduledItems) {
+    if (exceptionLayerKeys.has(item.layerKey)) {
+      exceptionSet.add(normalizeDate(new Date(item.date)))
     }
   }
-  return holidaySet
+  return exceptionSet
 }
 
 function countValidDaySpan(
@@ -118,7 +127,7 @@ function nextSchoolDate(
   return candidate
 }
 
-function toEffectiveGroupingKeys(
+function toEffectiveLayerKeys(
   calendar: Calendar,
   explicitKeys?: string[]
 ): Set<string> {
@@ -127,16 +136,16 @@ function toEffectiveGroupingKeys(
   }
 
   return new Set(
-    calendar.groupings
-      .filter((grouping) => grouping.autoShift)
-      .map((grouping) => grouping.key)
+    calendar.layers
+      .filter((layer) => layer.chainBehavior === 'linked')
+      .map((layer) => layer.key)
   )
 }
 
 export function useScheduleAdjuster() {
-  function shiftCalendarDaysLocally(
+  function shiftScheduledItemsLocally(
     calendar: Calendar,
-    payload: ShiftCalendarDaysRequest
+    payload: ShiftScheduledItemsRequest
   ): Calendar {
     const workingCopy = JSON.parse(JSON.stringify(calendar)) as Calendar
 
@@ -144,114 +153,109 @@ export function useScheduleAdjuster() {
       return workingCopy
     }
 
-    const targetDay = workingCopy.days.find((day) => day.id === payload.dayId)
-    if (!targetDay) {
+    const targetId = payload.scheduledItemId
+    const targetItem = workingCopy.scheduledItems.find(
+      (item) => item.id === targetId
+    )
+    if (!targetItem) {
       return workingCopy
     }
 
-    const effectiveGroupingKeys = toEffectiveGroupingKeys(
+    const effectiveLayerKeys = toEffectiveLayerKeys(
       workingCopy,
-      payload.groupingKeys
+      payload.layerKeys
     )
 
-    // Get holiday dates for exclusion
-    const holidayDates = getHolidayDates(workingCopy.days)
+    const exceptionDates = getExceptionDates(workingCopy)
 
-    // Calculate new date for target day (raw delta shift)
-    const rawNewDate = addDays(new Date(targetDay.date), payload.shiftByDays)
+    const rawNewDate = addDays(new Date(targetItem.date), payload.shiftByDays)
 
-    // Validate and adjust target date to next valid school date
     const newTargetDate = nextSchoolDate(
       rawNewDate,
       workingCopy.includeWeekends,
-      holidayDates
+      exceptionDates
     )
 
-    // Find starting sequence for reflow
-    const startingSequence = targetDay.groupingSequence
+    const startingSequence = targetItem.sequenceIndex ?? 0
 
-    // Get all days that need to be reflowed, sorted by sequence
-    const daysToReflow = workingCopy.days
+    const itemsToReflow = workingCopy.scheduledItems
       .filter(
-        (day) =>
-          effectiveGroupingKeys.has(day.groupingKey) &&
-          day.groupingSequence >= startingSequence
+        (item) =>
+          effectiveLayerKeys.has(item.layerKey) &&
+          (item.sequenceIndex ?? 0) >= startingSequence
       )
-      .sort((a, b) => a.groupingSequence - b.groupingSequence)
+      .sort(
+        (a, b) =>
+        (a.sequenceIndex ?? 0) - (b.sequenceIndex ?? 0)
+      )
 
-    if (daysToReflow.length === 0) {
-      // No days to reflow, just update target day
-      const updatedDays = workingCopy.days.map((day) =>
-        day.id === targetDay.id
-          ? { ...day, date: newTargetDate.toISOString() }
-          : day
+    if (itemsToReflow.length === 0) {
+      const updatedItems = workingCopy.scheduledItems.map((item) =>
+        item.id === targetItem.id
+          ? { ...item, date: newTargetDate.toISOString() }
+          : item
       )
-      return { ...workingCopy, days: updatedDays }
+      return { ...workingCopy, scheduledItems: updatedItems }
     }
 
-    // Ensure target day is first (sequence ties)
-    const targetIndex = daysToReflow.findIndex((day) => day.id === targetDay.id)
+    const targetIndex = itemsToReflow.findIndex(
+      (item) => item.id === targetItem.id
+    )
     if (targetIndex === -1) {
-      const updatedDays = workingCopy.days.map((day) =>
-        day.id === targetDay.id
-          ? { ...day, date: newTargetDate.toISOString() }
-          : day
+      const updatedItems = workingCopy.scheduledItems.map((item) =>
+        item.id === targetItem.id
+          ? { ...item, date: newTargetDate.toISOString() }
+          : item
       )
-      return { ...workingCopy, days: updatedDays }
+      return { ...workingCopy, scheduledItems: updatedItems }
     }
     if (targetIndex > 0) {
-      const [targetInList] = daysToReflow.splice(targetIndex, 1)
+      const [targetInList] = itemsToReflow.splice(targetIndex, 1)
       if (targetInList) {
-        daysToReflow.unshift(targetInList)
+        itemsToReflow.unshift(targetInList)
       }
     }
 
-    // Capture valid-day gaps between consecutive days (after target reordering)
     const gapSpans: number[] = []
-    for (let i = 0; i < daysToReflow.length - 1; i++) {
-      const current = new Date(daysToReflow[i]!.date)
-      const next = new Date(daysToReflow[i + 1]!.date)
+    for (let i = 0; i < itemsToReflow.length - 1; i++) {
+      const current = new Date(itemsToReflow[i]!.date)
+      const next = new Date(itemsToReflow[i + 1]!.date)
       const span = countValidDaySpan(
         current,
         next,
         workingCopy.includeWeekends,
-        holidayDates
+        exceptionDates
       )
       gapSpans.push(span > 0 ? span : 1)
     }
 
-    // Set target day's new date (first in reflow list)
-    const firstDay = daysToReflow[0]!
-    const updatedFirstDay = {
-      ...firstDay,
+    const firstItem = itemsToReflow[0]!
+    const updatedFirstItem = {
+      ...firstItem,
       date: newTargetDate.toISOString(),
     }
 
-    // Generate valid dates for remaining days
-    const remainingDays = daysToReflow.slice(1)
+    const remainingItems = itemsToReflow.slice(1)
 
-    // Create updated days map
-    const updatedDaysMap = new Map<string, CalendarDay>()
-    for (const day of workingCopy.days) {
-      updatedDaysMap.set(day.id, day)
+    const updatedItemsMap = new Map<string, ScheduledItem>()
+    for (const item of workingCopy.scheduledItems) {
+      updatedItemsMap.set(item.id, item)
     }
 
-    // Update first day
-    updatedDaysMap.set(updatedFirstDay.id, updatedFirstDay)
+    updatedItemsMap.set(updatedFirstItem.id, updatedFirstItem)
 
-    // Update remaining days, preserving prior gaps
     let previousDate = newTargetDate
-    for (let i = 0; i < remainingDays.length; i++) {
-      const day = remainingDays[i]!
+    for (let i = 0; i < remainingItems.length; i++) {
+      const item = remainingItems[i]!
       const span = gapSpans[i] ?? 1
       const nextDate = addValidSchoolDays(
         previousDate,
         span,
         workingCopy.includeWeekends,
-        holidayDates
+        exceptionDates
       )
-      updatedDaysMap.set(day.id, {
-        ...day,
+      updatedItemsMap.set(item.id, {
+        ...item,
         date: nextDate.toISOString(),
       })
       previousDate = nextDate
@@ -259,25 +263,25 @@ export function useScheduleAdjuster() {
 
     return {
       ...workingCopy,
-      days: Array.from(updatedDaysMap.values()),
+      scheduledItems: Array.from(updatedItemsMap.values()),
     }
   }
 
-  function groupingOptions(calendar: Calendar): Array<{
+  function layerOptions(calendar: Calendar): Array<{
     key: string
     label: string
-    autoShift: boolean
+    chainBehavior: string
   }> {
-    return calendar.groupings.map((grouping: CalendarGrouping) => ({
-      key: grouping.key,
-      label: grouping.name,
-      autoShift: grouping.autoShift,
+    return calendar.layers.map((layer: CalendarLayer) => ({
+      key: layer.key,
+      label: layer.name,
+      chainBehavior: layer.chainBehavior,
     }))
   }
 
   return {
-    shiftCalendarDaysLocally,
-    groupingOptions,
+    shiftScheduledItemsLocally,
+    layerOptions,
   }
 }
 

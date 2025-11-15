@@ -1,5 +1,5 @@
 {
-  "name": "my-abeka-calendar",
+  "name": "flex-calendar",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -36,11 +36,15 @@
   "dependencies": {
     "@fastify/cors": "^10.0.2",
     "@fastify/sensible": "^6.0.0",
+    "@primeuix/themes": "^1.2.5",
+    "@primevue/themes": "^4.4.1",
     "@tanstack/vue-query": "^5.62.7",
     "dotenv": "^16.4.5",
     "fastify": "^5.0.0",
     "mongoose": "^8.8.0",
     "pinia": "^3.0.3",
+    "primeicons": "^7.0.0",
+    "primevue": "^4.1.1",
     "vue": "^3.5.22",
     "vue-router": "^4.6.3",
     "zod": "^3.23.8"

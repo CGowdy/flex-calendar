@@ -10,7 +10,7 @@ const envSchema = z.object({
   MONGODB_URI: z
     .string()
     .min(1, 'MONGODB_URI is required')
-    .default('mongodb://localhost:27017/my-abeka-calendar'),
+    .default('mongodb://localhost:27017/flex-calendar'),
   CORS_ORIGIN: z.string().optional(),
 })
 

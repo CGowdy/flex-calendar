@@ -6,7 +6,7 @@ import {
   countValidDaySpan,
   generateValidSchoolDates,
   isWeekend,
-} from '../dateUtils'
+} from '../dateUtils.js'
 
 describe('dateUtils', () => {
   it('adds days using UTC setters/getters to avoid tz drift', () => {
@@ -40,7 +40,7 @@ describe('dateUtils', () => {
     const startOnFriday = new Date('2025-08-01T00:00:00.000Z') // Friday
     const dates = generateValidSchoolDates(startOnFriday, 4, false)
 
-    expect(dates.map((d) => d.toISOString())).toEqual([
+    expect(dates.map((d: Date) => d.toISOString())).toEqual([
       '2025-08-01T00:00:00.000Z', // Fri
       '2025-08-04T00:00:00.000Z', // Mon
       '2025-08-05T00:00:00.000Z', // Tue

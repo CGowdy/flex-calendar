@@ -1,7 +1,7 @@
-# My Abeka Calendar
+# Flex Calendar
 
-Homeschool calendar planner for aligning Abeka lesson pacing with the realities of family life.  
-The app lets you import/seed schedules, manage multiple grouping tracks (Abeka, Student A/B, Holidays), and quickly reschedule lesson days with domino-style shifts.
+A flexible, chain-aware calendar for any sequential workflow—lesson plans, content pipelines, training programs, or recovery schedules.  
+The app lets you define layered plans (reference, progress, exceptions), generate template items, and quickly reflow linked layers while respecting weekends and exception blocks.
 
 ## Stack
 
@@ -80,7 +80,7 @@ GitHub Actions runs lint, type-check, unit + server tests, and build on pushes/P
 | `bun run build` | Type-check and build both frontend and backend |
 | `bun run build:server` | Compile server TypeScript to `dist/server` |
 | `bun run start:server:bun` | Run compiled Fastify server with Bun |
-| `bun run seed:sample` | Seed MongoDB with a sample Abeka calendar |
+| `bun run seed:sample` | Seed MongoDB with a sample Flex Calendar |
 | `bun run test:unit` | Run frontend + backend Vitest suite |
 | `bun run test:server` | Run server-only tests with Node environment |
 | `bun run lint` | ESLint (auto-fix enabled) |
@@ -135,7 +135,7 @@ This uses the same `MONGODB_URI` configured for the API.
 
 See `env.example` for defaults. Key values:
 
-- `MONGODB_URI` – Mongo connection string (dev: `mongodb://root:example@localhost:27017/my-abeka-calendar?authMechanism=DEFAULT`)  
+- `MONGODB_URI` – Mongo connection string (dev: `mongodb://root:example@localhost:27017/flex-calendar?authMechanism=DEFAULT`)  
 - `PORT` / `HOST` – Fastify listener  
 - `CORS_ORIGIN` – Optional in dev (Vite proxy handles same-origin)  
 - `VITE_API_URL` – Optional override when not using the Vite proxy
@@ -156,6 +156,6 @@ See `docs/product-spec.md` for the problem statement, core flows, acceptance cri
 
 ## Next Steps
 
-- Integrate Abeka ICS feed import  
-- Add catch-up plan visualizations  
-- Expand drag & drop interactions in `DraggableCalendarGrid`
+- Layer-specific presets (fitness plans, editorial calendars, training ramps)  
+- Catch-up planner visualizations and manual adjustments  
+- Expanded drag & drop interactions in `DraggableCalendarGrid`

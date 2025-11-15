@@ -9,7 +9,7 @@ async function seedSampleCalendar() {
   await connectToDatabase()
 
   const existing = await CalendarModel.findOne({
-    name: 'Sample Abeka Calendar',
+    name: 'Sample Flex Calendar',
   })
     .lean()
     .exec()
@@ -20,36 +20,43 @@ async function seedSampleCalendar() {
   }
 
   await createCalendar({
-    name: 'Sample Abeka Calendar',
-    source: 'abeka',
+    name: 'Sample Flex Calendar',
+    presetKey: 'sample-flex',
     startDate: new Date().toISOString(),
-    totalDays: 170,
     includeWeekends: false,
-    includeHolidays: false,
-    groupings: [
+    includeExceptions: false,
+    layers: [
       {
-        key: 'abeka',
-        name: 'Abeka',
+        key: 'reference',
+        name: 'Reference Layer',
         color: '#2563eb',
-        autoShift: true,
+        chainBehavior: 'linked',
+        kind: 'standard',
+        templateConfig: {
+          mode: 'generated',
+          itemCount: 170,
+          titlePattern: 'Reference {n}',
+        },
       },
       {
-        key: 'student-a',
-        name: 'Student A',
+        key: 'progress-a',
+        name: 'Progress A',
         color: '#059669',
-        autoShift: true,
+        chainBehavior: 'linked',
+        kind: 'standard',
+        templateConfig: {
+          mode: 'generated',
+          itemCount: 170,
+          titlePattern: 'Progress {n}',
+        },
       },
       {
-        key: 'student-b',
-        name: 'Student B',
-        color: '#7c3aed',
-        autoShift: true,
-      },
-      {
-        key: 'holidays',
-        name: 'Holidays',
+        key: 'exceptions',
+        name: 'Exceptions',
         color: '#ca8a04',
-        autoShift: false,
+        chainBehavior: 'independent',
+        kind: 'exception',
+        templateConfig: { mode: 'manual' },
       },
     ],
   })

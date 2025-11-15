@@ -3,40 +3,40 @@ import { computed, reactive, watch } from 'vue'
 
 import type {
   Calendar,
-  CalendarDay,
-  ShiftCalendarDaysRequest,
+  ScheduledItem,
+  ShiftScheduledItemsRequest,
 } from '@/features/calendar/types/calendar'
 
 const props = defineProps<{
   open: boolean
   calendar: Calendar | null
-  day: CalendarDay | null
-  autoShiftGroupingKeys: string[]
+  day: ScheduledItem | null
+  linkedLayerKeys: string[]
   busy?: boolean
 }>()
 
 const emit = defineEmits<{
   (event: 'close'): void
-  (event: 'shift', payload: ShiftCalendarDaysRequest): void
+  (event: 'shift', payload: ShiftScheduledItemsRequest): void
 }>()
 
 const state = reactive({
   shiftByDays: 1,
-  groupingSelections: [] as string[],
+  layerSelections: [] as string[],
 })
 
-const groupingOptions = computed(() => props.calendar?.groupings ?? [])
+const layerOptions = computed(() => props.calendar?.layers ?? [])
 
 watch(
   () => props.day,
   (day) => {
     if (!day) {
-      state.groupingSelections = []
+      state.layerSelections = []
       return
     }
-    const defaults = new Set(props.autoShiftGroupingKeys)
-    defaults.add(day.groupingKey)
-    state.groupingSelections = Array.from(defaults)
+    const defaults = new Set(props.linkedLayerKeys)
+    defaults.add(day.layerKey)
+    state.layerSelections = Array.from(defaults)
     state.shiftByDays = 1
   },
   { immediate: true }
@@ -55,331 +55,150 @@ function formatDate(iso: string | undefined): string {
 function handleShift(sign: number) {
   if (!props.day) return
   emit('shift', {
-    dayId: props.day.id,
+    scheduledItemId: props.day.id,
     shiftByDays: sign,
-    groupingKeys: state.groupingSelections,
+    layerKeys: state.layerSelections,
   })
 }
 
 function handleSubmit() {
   if (!props.day || state.shiftByDays === 0 || props.busy) return
   emit('shift', {
-    dayId: props.day.id,
+    scheduledItemId: props.day.id,
     shiftByDays: state.shiftByDays,
-    groupingKeys: state.groupingSelections,
+    layerKeys: state.layerSelections,
   })
 }
 </script>
 
 <template>
-  <transition name="drawer">
+  <Transition
+    enter-active-class="transition duration-200 ease-out"
+    enter-from-class="translate-x-6 opacity-0"
+    enter-to-class="translate-x-0 opacity-100"
+    leave-active-class="transition duration-150 ease-in"
+    leave-from-class="translate-x-0 opacity-100"
+    leave-to-class="translate-x-6 opacity-0"
+  >
     <aside
       v-if="open && day"
-      class="drawer"
+      class="fixed inset-y-0 right-0 z-40 flex w-full max-w-md flex-col gap-6 border-l border-slate-200 bg-white p-6 shadow-[0_15px_45px_-25px_rgba(15,23,42,0.65)] dark:border-slate-700 dark:bg-slate-900"
       role="dialog"
       aria-modal="true"
     >
-      <template v-if="day">
-        <header class="drawer__header">
-          <div>
-            <h2>{{ day!.label }}</h2>
-            <p class="drawer__meta">
-              {{ formatDate(day!.date) }} · Track:
-              {{ calendar?.groupings.find((group) => group.key === day!.groupingKey)?.name ?? day!.groupingKey }}
+      <header class="flex items-start justify-between gap-4">
+        <div>
+          <h2 class="text-lg font-semibold text-slate-900 dark:text-white">{{ day!.title }}</h2>
+          <p class="text-sm text-slate-500 dark:text-slate-400">
+            {{ formatDate(day!.date) }} · Layer:
+            <span class="font-medium text-slate-700 dark:text-slate-200">
+              {{ calendar?.layers.find((layer) => layer.key === day!.layerKey)?.name ?? day!.layerKey }}
+            </span>
+          </p>
+        </div>
+        <button
+          type="button"
+          class="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-transparent text-slate-500 transition hover:border-slate-200 hover:bg-slate-100 dark:text-slate-300 dark:hover:border-slate-700 dark:hover:bg-slate-800/70 disabled:cursor-not-allowed disabled:opacity-60"
+          :disabled="busy"
+          @click="emit('close')"
+          aria-label="Close day details"
+        >
+          ✕
+        </button>
+      </header>
+
+      <section class="flex-1 space-y-6 overflow-y-auto pr-1">
+        <article class="space-y-3 rounded-2xl border border-slate-200 bg-white/95 p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900/80">
+          <h3 class="text-base font-semibold text-slate-900 dark:text-white">Event details</h3>
+          <div class="space-y-2 text-sm text-slate-600 dark:text-slate-300">
+            <div>
+              <p class="text-xs uppercase tracking-[0.3em] text-slate-400">Title</p>
+              <strong class="text-base text-slate-900 dark:text-white">{{ day!.title }}</strong>
+            </div>
+            <p v-if="day!.description">{{ day!.description }}</p>
+            <p v-else class="text-slate-500 dark:text-slate-400">No description provided.</p>
+            <p v-if="day!.notes" class="text-slate-500 dark:text-slate-400">
+              Notes: {{ day!.notes }}
             </p>
           </div>
-          <button
-            type="button"
-            class="icon-button"
-            :disabled="busy"
-            @click="emit('close')"
-            aria-label="Close day details"
-          >
-            ✕
-          </button>
-        </header>
+          <span class="text-xs font-semibold uppercase tracking-[0.25em] text-blue-600 dark:text-blue-300">
+            Duration: {{ day!.durationDays ?? 1 }} day{{ (day!.durationDays ?? 1) === 1 ? '' : 's' }}
+          </span>
+        </article>
 
-        <section class="drawer__body">
-          <article class="lesson-card">
-            <h3>Lesson details</h3>
-            <ul>
-              <li
-                v-for="event in day!.events"
-                :key="event.id"
-              >
-                <strong>{{ event.title }}</strong>
-                <p v-if="event.description">{{ event.description }}</p>
-                <span class="duration">
-                  Duration: {{ event.durationDays }} day{{ event.durationDays === 1 ? '' : 's' }}
-                </span>
-              </li>
-            </ul>
-            <p v-if="day!.events.length === 0">No events recorded for this day.</p>
-          </article>
+        <article class="space-y-5 rounded-2xl border border-slate-200 bg-white/95 p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900/80">
+          <header class="space-y-1">
+            <h3 class="text-base font-semibold text-slate-900 dark:text-white">Reschedule items</h3>
+            <p class="text-sm text-slate-500 dark:text-slate-400">
+              Select the layers that should adjust with this change.
+            </p>
+          </header>
 
-          <article class="shift-card">
-            <header class="shift-card__header">
-              <h3>Reschedule lessons</h3>
-              <p>Select the tracks that should adjust with this change.</p>
-            </header>
+          <div class="flex flex-col gap-2 sm:flex-row">
+            <button
+              type="button"
+              class="flex-1 rounded-full border border-blue-200 bg-blue-50 px-3 py-2 text-xs font-semibold text-blue-700 transition hover:bg-blue-100 disabled:cursor-not-allowed disabled:opacity-50 dark:border-blue-400/60 dark:bg-blue-500/10 dark:text-blue-100"
+              :disabled="busy"
+              @click="handleShift(-1)"
+            >
+              Move up 1 day
+            </button>
+            <button
+              type="button"
+              class="flex-1 rounded-full border border-blue-200 bg-blue-50 px-3 py-2 text-xs font-semibold text-blue-700 transition hover:bg-blue-100 disabled:cursor-not-allowed disabled:opacity-50 dark:border-blue-400/60 dark:bg-blue-500/10 dark:text-blue-100"
+              :disabled="busy"
+              @click="handleShift(1)"
+            >
+              Delay 1 day
+            </button>
+          </div>
 
-            <div class="quick-actions">
-              <button
-                type="button"
-                class="chip-button"
+          <form class="flex flex-col gap-4" @submit.prevent="handleSubmit">
+            <label class="flex flex-col gap-2 text-sm font-semibold text-slate-600 dark:text-slate-200">
+              <span>Shift by (days)</span>
+              <input
+                v-model.number="state.shiftByDays"
+                type="number"
+                min="-30"
+                max="30"
                 :disabled="busy"
-                @click="handleShift(-1)"
-              >
-                Move up 1 day
-              </button>
-              <button
-                type="button"
-                class="chip-button"
-                :disabled="busy"
-                @click="handleShift(1)"
-              >
-                Delay 1 day
-              </button>
-            </div>
+                class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-base text-slate-900 shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+              />
+            </label>
 
-            <form class="shift-form" @submit.prevent="handleSubmit">
-              <label class="field">
-                <span>Shift by (days)</span>
-                <input
-                  v-model.number="state.shiftByDays"
-                  type="number"
-                  min="-30"
-                  max="30"
-                  :disabled="busy"
-                />
-              </label>
+            <fieldset class="space-y-3 rounded-xl border border-slate-200/80 p-3 dark:border-slate-700/70">
+              <legend class="px-1 text-xs font-semibold uppercase tracking-[0.3em] text-slate-400">Layer adjustments</legend>
+              <ul class="space-y-2 text-sm text-slate-600 dark:text-slate-300">
+                <li
+                  v-for="layer in layerOptions"
+                  :key="layer.key"
+                >
+                  <label class="inline-flex items-center gap-3">
+                    <input
+                      type="checkbox"
+                      :value="layer.key"
+                      v-model="state.layerSelections"
+                      :disabled="busy"
+                      class="h-4 w-4 rounded border-slate-300 text-brand focus:ring-brand dark:border-slate-600"
+                    />
+                    <span>{{ layer.name }}</span>
+                  </label>
+                </li>
+              </ul>
+            </fieldset>
 
-              <fieldset class="grouping-fieldset">
-                <legend>Grouping adjustments</legend>
-                <ul>
-                  <li
-                    v-for="group in groupingOptions"
-                    :key="group.key"
-                  >
-                    <label class="toggle">
-                      <input
-                        type="checkbox"
-                        :value="group.key"
-                        v-model="state.groupingSelections"
-                        :disabled="busy"
-                      />
-                      <span>{{ group.name }}</span>
-                    </label>
-                  </li>
-                </ul>
-              </fieldset>
-
-              <button
-                type="submit"
-                class="primary-button"
-                :disabled="busy || state.shiftByDays === 0"
-              >
-                <span v-if="busy">Updating…</span>
-                <span v-else>Apply shift</span>
-              </button>
-            </form>
-          </article>
-        </section>
-      </template>
+            <button
+              type="submit"
+              class="ml-auto inline-flex items-center justify-center rounded-xl bg-gradient-to-r from-blue-600 to-indigo-500 px-4 py-2 text-sm font-semibold text-white shadow-lg transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-60"
+              :disabled="busy || state.shiftByDays === 0"
+            >
+              <span v-if="busy">Updating…</span>
+              <span v-else>Apply shift</span>
+            </button>
+          </form>
+        </article>
+      </section>
     </aside>
-  </transition>
+  </Transition>
 </template>
-
-<style scoped>
-.drawer {
-  position: fixed;
-  top: 0;
-  right: 0;
-  width: min(360px, 100%);
-  height: 100%;
-  background: var(--color-background);
-  border-left: 1px solid var(--color-border);
-  box-shadow: -20px 0 40px -30px rgba(15, 23, 42, 0.4);
-  padding: 1.5rem;
-  display: flex;
-  flex-direction: column;
-  gap: 1.5rem;
-  z-index: 40;
-}
-
-.drawer-enter-active,
-.drawer-leave-active {
-  transition: transform 0.25s ease, opacity 0.2s ease;
-}
-
-.drawer-enter-from,
-.drawer-leave-to {
-  transform: translateX(20px);
-  opacity: 0;
-}
-
-.drawer__header {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  gap: 1rem;
-}
-
-.drawer__meta {
-  font-size: 0.85rem;
-  color: rgba(15, 23, 42, 0.7);
-}
-
-.icon-button {
-  border: none;
-  background: transparent;
-  cursor: pointer;
-  font-size: 1.1rem;
-  padding: 0.35rem;
-  border-radius: 0.5rem;
-}
-
-.icon-button:hover:not(:disabled) {
-  background: rgba(15, 23, 42, 0.08);
-}
-
-.drawer__body {
-  flex: 1 1 auto;
-  overflow-y: auto;
-  display: flex;
-  flex-direction: column;
-  gap: 1.5rem;
-}
-
-.lesson-card,
-.shift-card {
-  border: 1px solid var(--color-border);
-  border-radius: 1rem;
-  padding: 1rem;
-  background: var(--color-background-soft);
-}
-
-.lesson-card ul {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: grid;
-  gap: 0.75rem;
-}
-
-.lesson-card strong {
-  display: block;
-}
-
-.lesson-card p {
-  font-size: 0.85rem;
-  color: rgba(15, 23, 42, 0.75);
-}
-
-.duration {
-  font-size: 0.75rem;
-  color: rgba(37, 99, 235, 0.8);
-}
-
-.shift-card__header h3 {
-  margin-bottom: 0.35rem;
-}
-
-.shift-card__header p {
-  font-size: 0.85rem;
-  color: rgba(15, 23, 42, 0.7);
-}
-
-.quick-actions {
-  display: flex;
-  gap: 0.5rem;
-  margin: 0.75rem 0;
-}
-
-.chip-button {
-  flex: 1 1 auto;
-  border: 1px solid rgba(37, 99, 235, 0.4);
-  background: rgba(37, 99, 235, 0.12);
-  color: #1d4ed8;
-  border-radius: 999px;
-  padding: 0.35rem 0.75rem;
-  font-size: 0.8rem;
-  cursor: pointer;
-}
-
-.shift-form {
-  display: flex;
-  flex-direction: column;
-  gap: 1rem;
-}
-
-.field {
-  display: flex;
-  flex-direction: column;
-  gap: 0.35rem;
-}
-
-.field span {
-  font-size: 0.85rem;
-  font-weight: 600;
-}
-
-.field input {
-  border: 1px solid var(--color-border);
-  border-radius: 0.75rem;
-  padding: 0.55rem 0.75rem;
-  font-size: 0.95rem;
-}
-
-.grouping-fieldset {
-  border: none;
-  display: flex;
-  flex-direction: column;
-  gap: 0.6rem;
-  padding: 0;
-}
-
-.grouping-fieldset legend {
-  font-size: 0.85rem;
-  font-weight: 600;
-}
-
-.grouping-fieldset ul {
-  list-style: none;
-  padding: 0;
-  margin: 0;
-  display: grid;
-  gap: 0.35rem;
-}
-
-.toggle {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.5rem;
-  font-size: 0.85rem;
-  cursor: pointer;
-}
-
-.primary-button {
-  align-self: flex-end;
-  background: linear-gradient(135deg, #2563eb, #1d4ed8);
-  color: #fff;
-  padding: 0.55rem 1.2rem;
-  border-radius: 0.75rem;
-  border: none;
-  cursor: pointer;
-  font-weight: 600;
-}
-
-.primary-button:disabled {
-  cursor: not-allowed;
-  opacity: 0.6;
-}
-
-@media (max-width: 640px) {
-  .drawer {
-    width: 100%;
-  }
-}
-</style>
 

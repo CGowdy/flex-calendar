@@ -4,20 +4,18 @@ import {
   CalendarModel,
   type Calendar,
   type CalendarDocument,
-  type CalendarDay,
-  type CalendarEvent,
-  type CalendarGrouping,
+  type CalendarLayer,
+  type ScheduledItem,
 } from '../models/calendarModel.js'
 import type {
   CalendarDTO,
-  CalendarDayDTO,
+  CalendarLayerDTO,
   CalendarEventDTO,
-  CalendarGroupingDTO,
   CalendarSummaryDTO,
 } from '../types/calendar.js'
 import type {
   CreateCalendarInput,
-  ShiftCalendarDaysInput,
+  ShiftScheduledItemsInput,
   UpdateCalendarInput,
 } from '../schemas/calendarSchemas.js'
 import {
@@ -30,52 +28,77 @@ import {
 } from '../utils/dateUtils.js'
 import { nanoid } from '../utils/id.js'
 
-type CalendarDaySubdocument = CalendarDocument['days'][number]
-type CalendarGroupingSubdocument = CalendarDocument['groupings'][number]
+type ScheduledItemSubdocument = CalendarDocument['scheduledItems'][number]
+type CalendarLayerSubdocument = CalendarDocument['layers'][number]
 
-const DEFAULT_GROUPINGS: CalendarGrouping[] = [
+type LayerInput = {
+  key: string
+  name: string
+  color?: string
+  description?: string
+  chainBehavior?: 'linked' | 'independent'
+  autoShift?: boolean
+  kind?: 'standard' | 'exception'
+  titlePattern?: string
+  templateConfig?: {
+    mode?: 'generated' | 'manual'
+    itemCount?: number
+    titlePattern?: string
+  }
+}
+
+const DEFAULT_LAYERS: Array<
+  CalendarLayer & {
+    templateConfig?: {
+      mode: 'generated' | 'manual'
+      itemCount?: number
+      titlePattern?: string
+    }
+  }
+> = [
   {
-    key: 'abeka',
-    name: 'Abeka',
+    key: 'reference',
+    name: 'Reference Plan',
     color: '#2563eb',
-    description: '',
+    description: 'Template sequence used as the baseline plan.',
     autoShift: true,
+    kind: 'standard',
+    templateConfig: { mode: 'generated', itemCount: 170, titlePattern: 'Day {n}' },
+  },
+  {
+    key: 'exceptions',
+    name: 'Exceptions',
+    color: '#f97316',
+    description: 'Dates to skip (holidays, blackout days, pauses).',
+    autoShift: false,
+    kind: 'exception',
+    templateConfig: { mode: 'manual' },
   },
 ]
 
-function toGroupingDTO(grouping: CalendarGrouping): CalendarGroupingDTO {
+function toLayerDTO(layer: CalendarLayer): CalendarLayerDTO {
   return {
-    key: grouping.key,
-    name: grouping.name,
-    color: grouping.color ?? '',
-    description: grouping.description ?? '',
-    autoShift: grouping.autoShift ?? true,
+    key: layer.key,
+    name: layer.name,
+    color: layer.color ?? '',
+    description: layer.description ?? '',
+    chainBehavior: layer.autoShift ? 'linked' : 'independent',
+    kind: layer.key === 'exceptions' ? 'exception' : 'standard',
   }
 }
 
-function toEventDTO(event: CalendarEvent): CalendarEventDTO {
-  const enrichedEvent = event as CalendarEvent & { id?: string }
+function toCalendarEventDTO(item: ScheduledItem): CalendarEventDTO {
+  const enrichedItem = item as ScheduledItem & { id?: string }
   return {
-    id: enrichedEvent.id ?? enrichedEvent._id,
-    title: enrichedEvent.title,
-    description: enrichedEvent.description ?? '',
-    durationDays: enrichedEvent.durationDays ?? 1,
-    metadata: (enrichedEvent.metadata ?? {}) as Record<string, unknown>,
-  }
-}
-
-function toDayDTO(day: CalendarDay): CalendarDayDTO {
-  const enrichedDay = day as CalendarDay & { id?: string }
-  return {
-    id: enrichedDay.id ?? enrichedDay._id,
-    date: new Date(enrichedDay.date),
-    groupingKey: enrichedDay.groupingKey,
-    groupingSequence: enrichedDay.groupingSequence,
-    label: enrichedDay.label,
-    notes: enrichedDay.notes ?? '',
-    events: Array.isArray(enrichedDay.events)
-      ? enrichedDay.events.map((event) => toEventDTO(event))
-      : [],
+    id: enrichedItem.id ?? enrichedItem._id,
+    date: new Date(enrichedItem.date),
+    layerKey: enrichedItem.layerKey,
+    sequenceIndex: enrichedItem.sequenceIndex ?? enrichedItem.groupingSequence,
+    title: enrichedItem.title,
+    description: enrichedItem.description ?? '',
+    notes: enrichedItem.notes ?? '',
+    durationDays: enrichedItem.durationDays ?? 1,
+    metadata: (enrichedItem.metadata ?? {}) as Record<string, unknown>,
   }
 }
 
@@ -85,13 +108,19 @@ function toCalendarDTO(calendar: CalendarDocument): CalendarDTO {
   return {
     id: json.id,
     name: json.name,
-    source: json.source,
-    startDate: new Date(json.startDate),
-    totalDays: json.totalDays,
+    presetKey: json.presetKey || json.source,
+    startDate: json.startDate ? new Date(json.startDate) : null,
     includeWeekends: json.includeWeekends,
-    includeHolidays: json.includeHolidays,
-    groupings: (json.groupings ?? []).map((grouping) => toGroupingDTO(grouping)),
-    days: (json.days ?? []).map((day) => toDayDTO(day)),
+    includeExceptions:
+      typeof json.includeExceptions === 'boolean'
+        ? json.includeExceptions
+        : Boolean(json.includeHolidays),
+    layers: (json.layers ?? json.groupings ?? []).map((layer) =>
+      toLayerDTO(layer as CalendarLayer)
+    ),
+    scheduledItems: (json.scheduledItems ?? json.days ?? []).map((item) =>
+      toCalendarEventDTO(item as ScheduledItem)
+    ),
   }
 }
 
@@ -101,98 +130,160 @@ function toCalendarSummary(calendar: CalendarDocument): CalendarSummaryDTO {
     id: dto.id,
     name: dto.name,
     startDate: dto.startDate,
-    totalDays: dto.totalDays,
-    groupings: dto.groupings,
+    layers: dto.layers,
   }
 }
 
-function normalizeGroupings(
-  groupings: CreateCalendarInput['groupings']
-): CalendarGrouping[] {
-  if (!groupings || groupings.length === 0) {
-    return DEFAULT_GROUPINGS
-  }
+const DEFAULT_TEMPLATE_ITEM_COUNT = 170
 
-  return groupings.map<CalendarGrouping>((grouping) => ({
-    key: grouping.key,
-    name: grouping.name,
-    color: grouping.color ?? '',
-    description: grouping.description ?? '',
-    autoShift: grouping.autoShift ?? true,
-  }))
+function resolveChainBehavior(
+  chainBehavior?: 'linked' | 'independent',
+  autoShift?: boolean,
+  kind: 'standard' | 'exception' = 'standard'
+): boolean {
+  if (chainBehavior === 'linked') return true
+  if (chainBehavior === 'independent') return false
+  if (typeof autoShift === 'boolean') return autoShift
+  return kind === 'exception' ? false : true
 }
 
-interface GenerateDaysParams {
-  groupingKey: string
-  groupingName: string
-  totalDays: number
+type NormalizedLayer = {
+  layer: CalendarLayer
+  templateConfig?: {
+    mode: 'generated' | 'manual'
+    itemCount?: number
+    titlePattern?: string
+  }
+}
+
+function normalizeLayers(layers: CreateCalendarInput['layers']): NormalizedLayer[] {
+  if (!layers) {
+    return DEFAULT_LAYERS.map((layer) => ({
+      layer: {
+        key: layer.key,
+        name: layer.name,
+        color: layer.color ?? '',
+        description: layer.description ?? '',
+        autoShift: layer.autoShift ?? true,
+        kind: layer.kind ?? 'standard',
+      } as CalendarLayer,
+      templateConfig: layer.templateConfig,
+    }))
+  }
+
+  const definedLayers = layers as LayerInput[]
+
+  if (definedLayers.length === 0) {
+    return []
+  }
+
+  return definedLayers.map((layer) => {
+    const kind = layer.kind ?? 'standard'
+    const providedTemplateConfig: NormalizedLayer['templateConfig'] | undefined =
+      layer.templateConfig
+        ? {
+            mode: layer.templateConfig.mode ?? 'generated',
+            itemCount: layer.templateConfig.itemCount,
+            titlePattern: layer.templateConfig.titlePattern ?? layer.titlePattern,
+          }
+        : undefined
+
+    const fallbackTemplateConfig: NormalizedLayer['templateConfig'] =
+      kind === 'standard'
+        ? {
+            mode: 'generated' as const,
+            itemCount:
+              providedTemplateConfig?.itemCount ?? DEFAULT_TEMPLATE_ITEM_COUNT,
+            titlePattern: providedTemplateConfig?.titlePattern ?? layer.titlePattern,
+          }
+        : { mode: 'manual' as const }
+
+    const normalized: NormalizedLayer = {
+      layer: {
+        key: layer.key,
+        name: layer.name,
+        color: layer.color ?? '',
+        description: layer.description ?? '',
+        autoShift: resolveChainBehavior(layer.chainBehavior, layer.autoShift, kind),
+        kind,
+      } as CalendarLayer,
+      templateConfig: providedTemplateConfig ?? fallbackTemplateConfig,
+    }
+
+    if (layer.titlePattern && !normalized.templateConfig?.titlePattern) {
+      normalized.templateConfig =
+        normalized.templateConfig ?? { mode: 'generated' as const }
+      normalized.templateConfig.titlePattern = layer.titlePattern
+    }
+
+    return normalized
+  })
+}
+
+interface GenerateScheduledItemsParams {
+  layerKey: string
+  layerName: string
+  itemCount: number
   startDate: Date
   includeWeekends: boolean
   titlePattern?: string
-  eventsForGrouping: Array<{
+  templateItems: Array<{
     title: string
     description?: string
     durationDays?: number
   }>
 }
 
-function generateDaysForGrouping({
-  groupingKey,
-  groupingName,
-  totalDays,
+function generateScheduledItemsForLayer({
+  layerKey,
+  layerName,
+  itemCount,
   startDate,
   includeWeekends,
   titlePattern,
-  eventsForGrouping,
+  templateItems,
   holidayDates,
-}: GenerateDaysParams & { holidayDates?: Set<string> }): CalendarDay[] {
-  const days: CalendarDay[] = []
+}: GenerateScheduledItemsParams & { holidayDates?: Set<string> }): ScheduledItem[] {
+  const scheduledItems: ScheduledItem[] = []
 
   // Generate all valid school dates upfront
   const validDates = generateValidSchoolDates(
     startDate,
-    totalDays,
+    itemCount,
     includeWeekends,
     holidayDates
   )
 
-  for (let index = 0; index < totalDays; index += 1) {
+  for (let index = 0; index < itemCount; index += 1) {
     const schoolDate = validDates[index]!
-    const groupingSequence = index + 1
+    const sequenceIndex = index + 1
 
-    const templateEvent = eventsForGrouping[groupingSequence - 1]
+    const templateEvent = templateItems[sequenceIndex - 1]
     const computedTitle =
       templateEvent?.title ??
       (titlePattern && titlePattern.includes('{n}')
-        ? titlePattern.replace('{n}', String(groupingSequence))
-        : `${groupingName} Lesson ${groupingSequence}`)
-    const events: CalendarEvent[] = [
-      {
-        _id: nanoid(),
-        title: computedTitle,
-        description: templateEvent?.description ?? '',
-        durationDays: templateEvent?.durationDays ?? 1,
-        metadata: {},
-      },
-    ]
+        ? titlePattern.replace('{n}', String(sequenceIndex))
+        : `${layerName} Item ${sequenceIndex}`)
 
-    days.push({
+    scheduledItems.push({
       _id: nanoid(),
       date: schoolDate,
-      groupingKey,
-      groupingSequence,
-      label: `Day ${groupingSequence}`,
+      layerKey,
+      sequenceIndex,
+      title: computedTitle,
+      description: templateEvent?.description ?? '',
       notes: '',
-      events,
+      durationDays: templateEvent?.durationDays ?? 1,
+      metadata: {},
     })
   }
 
-  return days
+  return scheduledItems
 }
 
 export async function listCalendars(): Promise<CalendarSummaryDTO[]> {
   const calendars = await CalendarModel.find()
-    .select(['name', 'startDate', 'totalDays', 'groupings'])
+    .select(['name', 'startDate', 'layers'])
     .exec()
 
   return calendars.map((calendar: CalendarDocument) =>
@@ -218,62 +309,64 @@ export async function getCalendarById(
 export async function createCalendar(
   payload: CreateCalendarInput
 ): Promise<CalendarDTO> {
-  const totalDays = payload.totalDays ?? 170
   const includeWeekends = payload.includeWeekends ?? false
-  const groupings = normalizeGroupings(payload.groupings)
-  const startDate = new Date(payload.startDate)
+  const startDate = payload.startDate ? new Date(payload.startDate) : null
+  const normalizedLayers = normalizeLayers(payload.layers)
 
-  const groupingPatternByKey = new Map<string, string | undefined>(
-    (payload.groupings ?? []).map((g) => [g.key, g.titlePattern])
+  const templateItemsByLayer = new Map(
+    Object.entries(payload.templateItemsByLayer ?? {})
   )
 
-  // Generate holidays grouping first (if selected) to get holiday dates
-  const holidaysGrouping = groupings.find((g) => g.key === 'holidays')
-  const holidayDays: CalendarDay[] = []
-  if (holidaysGrouping) {
-    // For now, holidays grouping is created but empty - user will add holidays later
-    // This allows us to get the holiday dates set (empty initially)
-  }
+  const exceptionLayerKeys = normalizedLayers
+    .filter(({ layer }) => layer.kind === 'exception' || layer.key === 'exceptions')
+    .map(({ layer }) => layer.key)
 
-  // Get holiday dates from any pre-existing holiday days
-  // (For initial creation, this will be empty, but structure supports future holiday import)
-  const holidayDates = getHolidayDates(holidayDays)
+  // For now, exception layers are created empty; scheduler will respect them once populated.
+  const holidayDates = new Set<string>()
 
-  // Generate days for non-holiday groupings, excluding holiday dates
-  const nonHolidayGroupings = groupings.filter((g) => g.key !== 'holidays')
-  const days = nonHolidayGroupings.flatMap((grouping) =>
-    generateDaysForGrouping({
-      groupingKey: grouping.key,
-      groupingName: grouping.name,
-      includeWeekends,
-      startDate,
-      totalDays,
-      titlePattern: groupingPatternByKey.get(grouping.key),
-      eventsForGrouping: payload.eventsPerGrouping?.[grouping.key] ?? [],
-      holidayDates,
-    })
-  )
+  const scheduledItems =
+    startDate === null
+      ? []
+      : normalizedLayers.flatMap(({ layer, templateConfig }) => {
+          if (
+            layer.kind === 'exception' ||
+            exceptionLayerKeys.includes(layer.key) ||
+            templateConfig?.mode === 'manual'
+          ) {
+            return []
+          }
 
-  // Add holiday days (empty for now, but structure supports future additions)
-  const allDays = [...days, ...holidayDays]
+          const itemCount =
+            templateConfig?.itemCount ?? DEFAULT_TEMPLATE_ITEM_COUNT
+
+          return generateScheduledItemsForLayer({
+            layerKey: layer.key,
+            layerName: layer.name,
+            includeWeekends,
+            startDate,
+            itemCount,
+            titlePattern: templateConfig?.titlePattern,
+            templateItems: templateItemsByLayer.get(layer.key) ?? [],
+            holidayDates,
+          })
+        })
 
   const calendar = await CalendarModel.create({
     name: payload.name,
-    source: payload.source ?? 'custom',
+    presetKey: payload.presetKey ?? payload.source ?? 'custom',
     startDate,
-    totalDays,
     includeWeekends,
-    includeHolidays: payload.includeHolidays ?? false,
-    groupings,
-    days: allDays,
+    includeExceptions: payload.includeExceptions ?? false,
+    layers: normalizedLayers.map(({ layer }) => layer),
+    scheduledItems,
   })
 
   return toCalendarDTO(calendar)
 }
 
-export async function shiftCalendarDays(
+export async function shiftScheduledItems(
   calendarId: string,
-  payload: ShiftCalendarDaysInput
+  payload: ShiftScheduledItemsInput
 ): Promise<CalendarDTO | null> {
   if (!Types.ObjectId.isValid(calendarId)) {
     return null
@@ -289,27 +382,26 @@ export async function shiftCalendarDays(
     return null
   }
 
-  const targetDay = calendar.days.find(
-    (day: CalendarDaySubdocument) => day._id === payload.dayId
+  const scheduledItemId = payload.scheduledItemId ?? payload.dayId
+  const targetItem = calendar.scheduledItems.find(
+    (item: ScheduledItemSubdocument) => item._id === scheduledItemId
   )
-  if (!targetDay) {
+  if (!targetItem) {
     return null
   }
 
-  const groupingKeys =
-    payload.groupingKeys && payload.groupingKeys.length > 0
-      ? payload.groupingKeys
-      : calendar.groupings
-          .filter(
-            (grouping: CalendarGroupingSubdocument) => grouping.autoShift
-          )
-          .map((grouping: CalendarGroupingSubdocument) => grouping.key)
+  const layerKeys =
+    payload.layerKeys && payload.layerKeys.length > 0
+      ? payload.layerKeys
+      : calendar.layers
+          .filter((layer: CalendarLayerSubdocument) => layer.autoShift)
+          .map((layer: CalendarLayerSubdocument) => layer.key)
 
   // Get holiday dates for exclusion
-  const holidayDates = getHolidayDates(calendar.days)
+  const holidayDates = getHolidayDates(calendar.scheduledItems)
 
   // Calculate new date for target day (raw delta shift)
-  const rawNewDate = addDays(targetDay.date, delta)
+  const rawNewDate = addDays(targetItem.date, delta)
 
   // Validate and adjust target date to next valid school date if needed
   // This ensures the target day doesn't land on a weekend/holiday (unless weekends are included)
@@ -320,50 +412,52 @@ export async function shiftCalendarDays(
   )
 
   // Find the starting sequence for reflow
-  const startingSequence = targetDay.groupingSequence
+  const startingSequence =
+    targetItem.sequenceIndex ?? targetItem.groupingSequence
 
   // Get all days that need to be reflowed, sorted by sequence
-  const daysToReflow = calendar.days
+  const itemsToReflow = calendar.scheduledItems
     .filter(
-      (day: CalendarDaySubdocument) =>
-        groupingKeys.includes(day.groupingKey) &&
-        day.groupingSequence >= startingSequence
+      (item: ScheduledItemSubdocument) =>
+        layerKeys.includes(item.layerKey) &&
+        (item.sequenceIndex ?? item.groupingSequence) >= startingSequence
     )
     .sort(
-      (a: CalendarDaySubdocument, b: CalendarDaySubdocument) =>
-        a.groupingSequence - b.groupingSequence
+      (a: ScheduledItemSubdocument, b: ScheduledItemSubdocument) =>
+        (a.sequenceIndex ?? a.groupingSequence) -
+        (b.sequenceIndex ?? b.groupingSequence)
     )
 
-  if (daysToReflow.length === 0) {
-    // No days to reflow, just update target day
-    targetDay.date = newTargetDate
-    calendar.markModified('days')
+  if (itemsToReflow.length === 0) {
+    // No items to reflow, just update target item
+    targetItem.date = newTargetDate
+    calendar.markModified('scheduledItems')
     await calendar.save()
     return toCalendarDTO(calendar)
   }
 
   // Ensure target day is first (sequence ties)
-  const targetIndex = daysToReflow.findIndex(
-    (day: CalendarDaySubdocument) => day._id === targetDay._id
+  const targetIndex = itemsToReflow.findIndex(
+    (item: ScheduledItemSubdocument) => item._id === targetItem._id
   )
   if (targetIndex === -1) {
-    targetDay.date = newTargetDate
-    calendar.markModified('days')
+    targetItem.date = newTargetDate
+    calendar.markModified('scheduledItems')
     await calendar.save()
     return toCalendarDTO(calendar)
   }
   if (targetIndex > 0) {
-    const [targetInList] = daysToReflow.splice(targetIndex, 1)
+    const [targetInList] = itemsToReflow.splice(targetIndex, 1)
     if (targetInList) {
-      daysToReflow.unshift(targetInList)
+      itemsToReflow.unshift(targetInList)
     }
   }
 
   // Capture valid-day gaps between consecutive days
   const gapSpans: number[] = []
-  for (let i = 0; i < daysToReflow.length - 1; i++) {
-    const current = new Date(daysToReflow[i]!.date)
-    const next = new Date(daysToReflow[i + 1]!.date)
+  for (let i = 0; i < itemsToReflow.length - 1; i++) {
+    const current = new Date(itemsToReflow[i]!.date)
+    const next = new Date(itemsToReflow[i + 1]!.date)
     const span = countValidDaySpan(
       current,
       next,
@@ -374,15 +468,14 @@ export async function shiftCalendarDays(
   }
 
   // Set the target day's new date (it's the first in the reflow list)
-  const firstDay = daysToReflow[0]!
-  firstDay.date = newTargetDate
+  const firstItem = itemsToReflow[0]!
+  firstItem.date = newTargetDate
 
-  // Generate valid dates for remaining days starting from day after target
-  const remainingDays = daysToReflow.slice(1)
+  const remainingItems = itemsToReflow.slice(1)
 
-  if (remainingDays.length > 0) {
+  if (remainingItems.length > 0) {
     let previousDate = newTargetDate
-    for (let i = 0; i < remainingDays.length; i++) {
+    for (let i = 0; i < remainingItems.length; i++) {
       const span = gapSpans[i] ?? 1
       const nextDate = addValidSchoolDays(
         previousDate,
@@ -390,12 +483,12 @@ export async function shiftCalendarDays(
         calendar.includeWeekends,
         holidayDates
       )
-      remainingDays[i]!.date = nextDate
+      remainingItems[i]!.date = nextDate
       previousDate = nextDate
     }
   }
 
-  calendar.markModified('days')
+  calendar.markModified('scheduledItems')
   await calendar.save()
 
   return toCalendarDTO(calendar)
@@ -414,15 +507,47 @@ export async function updateCalendar(
 
   let modified = false
 
-  if (payload.groupings && payload.groupings.length > 0) {
-    const byKey = new Map(calendar.groupings.map((g) => [g.key, g]))
-    for (const patch of payload.groupings) {
+  if (payload.layers && payload.layers.length > 0) {
+    const byKey = new Map(calendar.layers.map((layer) => [layer.key, layer]))
+    for (const patch of payload.layers) {
       const target = byKey.get(patch.key)
-      if (!target) continue
+      if (!target) {
+        if (!patch.name) {
+          throw new Error(`Layer ${patch.key} requires a name when creating`)
+        }
+        const kind = patch.kind ?? 'standard'
+        const newLayer: CalendarLayerSubdocument = {
+          key: patch.key,
+          name: patch.name,
+          color: patch.color ?? '',
+          description: patch.description ?? '',
+          autoShift: resolveChainBehavior(
+            patch.chainBehavior,
+            patch.autoShift,
+            kind
+          ),
+          kind,
+        }
+        calendar.layers.push(newLayer)
+        byKey.set(newLayer.key, newLayer)
+        modified = true
+        continue
+      }
       if (typeof patch.name === 'string') target.name = patch.name
       if (typeof patch.color === 'string') target.color = patch.color
       if (typeof patch.description === 'string') target.description = patch.description
-      if (typeof patch.autoShift === 'boolean') target.autoShift = patch.autoShift
+      if (typeof patch.chainBehavior === 'string') {
+        target.autoShift = resolveChainBehavior(
+          patch.chainBehavior,
+          patch.autoShift,
+          patch.kind ?? target.kind ?? 'standard'
+        )
+      } else if (typeof patch.autoShift === 'boolean') {
+        target.autoShift = patch.autoShift
+      }
+      if (typeof patch.kind === 'string') {
+        target.kind = patch.kind
+      }
       modified = true
     }
   }
@@ -431,13 +556,13 @@ export async function updateCalendar(
     calendar.includeWeekends = payload.includeWeekends
     modified = true
   }
-  if (typeof payload.includeHolidays === 'boolean') {
-    calendar.includeHolidays = payload.includeHolidays
+  if (typeof payload.includeExceptions === 'boolean') {
+    calendar.includeExceptions = payload.includeExceptions
     modified = true
   }
 
   if (modified) {
-    calendar.markModified('groupings')
+    calendar.markModified('layers')
     await calendar.save()
   }
 
