@@ -27,6 +27,7 @@ describe('SetupWizard', () => {
     await user.type(itemCountInput, '90')
 
     const submitButton = screen.getByRole('button', { name: /save calendar/i })
+    expect((submitButton as HTMLButtonElement).disabled).toBe(false)
     await user.click(submitButton)
 
     const submitEvents = emitted().submit as unknown[][] | undefined
@@ -53,6 +54,37 @@ describe('SetupWizard', () => {
         }),
       ])
     )
+  })
+
+  it('shows scoped exception summary when added', async () => {
+    const user = userEvent.setup()
+    render(SetupWizard)
+
+    const exceptionsSection = screen.getAllByRole('region', {
+      name: /exception dates \(optional\)/i,
+    })[0]!
+
+    const dateInput = within(exceptionsSection).getByLabelText(/^date$/i)
+    await user.clear(dateInput)
+    await user.type(dateInput, '2025-12-24')
+
+    const labelInput = within(exceptionsSection).getByLabelText(/label/i)
+    await user.type(labelInput, 'Holiday Break')
+
+    const customRadio = within(exceptionsSection).getByLabelText(/specific layers only/i)
+    await user.click(customRadio)
+
+    const targetSelect = within(exceptionsSection).getByLabelText(/target layers/i)
+    await user.selectOptions(targetSelect, ['progress-a'])
+
+    const addButton = within(exceptionsSection).getByRole('button', { name: /add exception/i })
+    await user.click(addButton)
+    await within(exceptionsSection).findByText(/holiday break/i)
+
+    const summary = screen.getByText(/Holiday Break/i).closest('li')
+    expect(summary).toBeTruthy()
+    expect(summary?.textContent).toMatch(/Applies to/i)
+    expect(summary?.textContent).toMatch(/Progress Layer/)
   })
 })
 

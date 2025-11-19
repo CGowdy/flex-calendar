@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, reactive } from 'vue'
+import { computed, reactive, ref, watch } from 'vue'
 
 import type {
   CreateCalendarLayerInput,
@@ -26,6 +26,15 @@ interface LayerOption {
   templateMode: 'generated' | 'manual'
   templateItemCount: number
   titlePattern: string
+}
+
+interface WizardExceptionEntry {
+  id: string
+  layerKey: string
+  date: string
+  title?: string
+  scope: 'global' | 'custom'
+  targetLayerKeys: string[]
 }
 
 const layerOptions = reactive<LayerOption[]>([
@@ -86,6 +95,109 @@ const form = reactive({
   includeExceptions: false,
 })
 
+const exceptionEntries = ref<WizardExceptionEntry[]>([])
+let exceptionIdCounter = 0
+const exceptionDraft = reactive({
+  layerKey: '',
+  date: '',
+  title: '',
+  scope: 'global' as 'global' | 'custom',
+  targetLayerKeys: [] as string[],
+})
+
+const selectedExceptionLayers = computed(() =>
+  layerOptions.filter((layer) => layer.kind === 'exception' && layer.selected)
+)
+
+const selectedStandardLayers = computed(() =>
+  layerOptions.filter((layer) => layer.kind === 'standard' && layer.selected)
+)
+
+watch(
+  () => selectedExceptionLayers.value.map((layer) => layer.key),
+  (keys) => {
+    if (keys.length === 0) {
+      exceptionDraft.layerKey = ''
+      exceptionEntries.value = []
+      return
+    }
+    if (!exceptionDraft.layerKey || !keys.includes(exceptionDraft.layerKey)) {
+      exceptionDraft.layerKey = keys[0]!
+    }
+    exceptionEntries.value = exceptionEntries.value.filter((entry) =>
+      keys.includes(entry.layerKey)
+    )
+  },
+  { immediate: true }
+)
+
+watch(
+  () => selectedStandardLayers.value.map((layer) => layer.key),
+  (keys) => {
+    const allowed = new Set(keys)
+    exceptionDraft.targetLayerKeys = exceptionDraft.targetLayerKeys.filter((key) =>
+      allowed.has(key)
+    )
+    exceptionEntries.value = exceptionEntries.value.map((entry) => ({
+      ...entry,
+      targetLayerKeys: entry.targetLayerKeys.filter((key) => allowed.has(key)),
+    }))
+  },
+  { deep: true }
+)
+
+resetExceptionDraft()
+
+function resetExceptionDraft() {
+  exceptionDraft.date = ''
+  exceptionDraft.title = ''
+  exceptionDraft.scope = 'global'
+  exceptionDraft.targetLayerKeys = []
+  if (selectedExceptionLayers.value.length > 0) {
+    exceptionDraft.layerKey = selectedExceptionLayers.value[0]!.key
+  } else {
+    exceptionDraft.layerKey = ''
+  }
+}
+
+function handleAddExceptionEntry() {
+  if (!exceptionDraft.date || !exceptionDraft.layerKey) {
+    return
+  }
+  if (exceptionDraft.scope === 'custom' && exceptionDraft.targetLayerKeys.length === 0) {
+    return
+  }
+
+  exceptionEntries.value = [
+    ...exceptionEntries.value,
+    {
+      id: `exception-${++exceptionIdCounter}`,
+      layerKey: exceptionDraft.layerKey,
+      date: exceptionDraft.date,
+      title: exceptionDraft.title.trim() || undefined,
+      scope: exceptionDraft.scope,
+      targetLayerKeys: exceptionDraft.scope === 'custom'
+        ? [...exceptionDraft.targetLayerKeys]
+        : [],
+    },
+  ]
+  resetExceptionDraft()
+}
+
+function handleRemoveExceptionEntry(id: string) {
+  exceptionEntries.value = exceptionEntries.value.filter((entry) => entry.id !== id)
+}
+
+function canAddExceptionEntry(): boolean {
+  if (!exceptionDraft.layerKey || !exceptionDraft.date) {
+    return false
+  }
+  if (exceptionDraft.scope === 'custom' && exceptionDraft.targetLayerKeys.length === 0) {
+    return false
+  }
+  return true
+}
+
 const isValid = computed(
   () =>
     form.name.trim().length > 0 &&
@@ -117,12 +229,23 @@ function handleSubmit() {
           : { mode: 'manual' as const },
     }))
 
+  const initialExceptions =
+    exceptionEntries.value.length > 0
+      ? exceptionEntries.value.map((entry) => ({
+          date: entry.date,
+          title: entry.title,
+          layerKey: entry.layerKey,
+          targetLayerKeys:
+            entry.scope === 'custom' ? [...entry.targetLayerKeys] : undefined,
+        }))
+      : undefined
   emit('submit', {
     name: form.name.trim(),
     startDate: new Date(form.startDate).toISOString(),
     includeWeekends: form.includeWeekends,
     includeExceptions: form.includeExceptions,
     layers,
+    initialExceptions,
   })
 }
 
@@ -292,6 +415,169 @@ function toggleLayerSelection(option: LayerOption) {
           </ul>
         </section>
 
+        <section
+          v-if="selectedExceptionLayers.length > 0"
+          class="space-y-4 rounded-2xl border border-slate-200/80 p-4 dark:border-slate-700/70"
+          aria-labelledby="wizard-exceptions-heading"
+        >
+          <div class="space-y-1">
+            <h3 id="wizard-exceptions-heading" class="text-lg font-semibold text-slate-900 dark:text-white">
+              Exception dates (optional)
+            </h3>
+            <p class="text-sm text-slate-500 dark:text-slate-400">
+              Preload blackout dates so the initial schedule skips them automatically. You can edit these later from the dashboard.
+            </p>
+          </div>
+
+          <div class="grid gap-4 md:grid-cols-2">
+            <label class="flex flex-col gap-2 text-sm font-semibold text-slate-600 dark:text-slate-200">
+              <span>Exception layer</span>
+              <select
+                v-model="exceptionDraft.layerKey"
+                class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                :disabled="submitting"
+              >
+                <option
+                  v-for="layer in selectedExceptionLayers"
+                  :key="layer.key"
+                  :value="layer.key"
+                >
+                  {{ layer.name }}
+                </option>
+              </select>
+            </label>
+
+            <label class="flex flex-col gap-2 text-sm font-semibold text-slate-600 dark:text-slate-200">
+              <span>Date</span>
+              <input
+                v-model="exceptionDraft.date"
+                type="date"
+                required
+                class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-base text-slate-900 shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                :disabled="submitting"
+              />
+            </label>
+
+            <label class="flex flex-col gap-2 text-sm font-semibold text-slate-600 dark:text-slate-200">
+              <span>Label (optional)</span>
+              <input
+                v-model="exceptionDraft.title"
+                type="text"
+                placeholder="Winter Break"
+                class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-base text-slate-900 shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                :disabled="submitting"
+              />
+            </label>
+
+            <fieldset class="space-y-2 rounded-xl border border-slate-200/80 p-3 dark:border-slate-700/70">
+              <legend class="px-1 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                Applies to
+              </legend>
+              <label class="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
+                <input
+                  type="radio"
+                  value="global"
+                  v-model="exceptionDraft.scope"
+                  :disabled="submitting"
+                />
+                <span>All layers that respect exceptions</span>
+              </label>
+              <label class="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
+                <input
+                  type="radio"
+                  value="custom"
+                  v-model="exceptionDraft.scope"
+                  :disabled="submitting"
+                />
+                <span>Specific layers only</span>
+              </label>
+
+              <div v-if="exceptionDraft.scope === 'custom'">
+                <label class="sr-only" for="wizard-exception-targets">Target layers</label>
+                <select
+                  id="wizard-exception-targets"
+                  v-model="exceptionDraft.targetLayerKeys"
+                  multiple
+                  class="mt-2 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                  :disabled="submitting"
+                >
+                  <option
+                    v-for="layer in selectedStandardLayers"
+                    :key="layer.key"
+                    :value="layer.key"
+                  >
+                    {{ layer.name }}
+                  </option>
+                </select>
+                <p class="mt-2 text-xs text-slate-500 dark:text-slate-400">
+                  Pick one or more layers to block on this date.
+                </p>
+              </div>
+            </fieldset>
+
+            <div class="md:col-span-2">
+              <button
+                type="button"
+                class="inline-flex w-full items-center justify-center rounded-xl border border-dashed border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-slate-400 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-600 dark:text-slate-100 dark:hover:border-slate-500 dark:hover:bg-slate-800/70"
+                :disabled="!canAddExceptionEntry() || submitting"
+                @click="handleAddExceptionEntry"
+              >
+                Add exception
+              </button>
+            </div>
+          </div>
+
+          <div class="space-y-3">
+            <p class="text-xs text-slate-500 dark:text-slate-400">
+              Hint: Exceptions added here will appear in the dashboard manager after creation.
+            </p>
+            <div
+              v-if="exceptionEntries.length === 0"
+              class="rounded-xl border border-dashed border-slate-300 p-4 text-sm text-slate-500 dark:border-slate-700 dark:text-slate-400"
+            >
+              No exception dates yet. Use the form above to add days off or blackout dates.
+            </div>
+            <ul v-else class="space-y-3">
+              <li
+                v-for="entry in exceptionEntries"
+                :key="entry.id"
+                class="flex items-start justify-between rounded-xl border border-slate-200/80 bg-white/95 px-4 py-3 text-sm dark:border-slate-700/70 dark:bg-slate-900/70"
+              >
+                <div>
+                  <p class="font-semibold text-slate-900 dark:text-slate-100">
+                    {{ new Date(entry.date).toLocaleDateString(undefined, { dateStyle: 'medium' }) }}
+                  </p>
+                  <p class="text-slate-600 dark:text-slate-300">
+                    {{ entry.title || 'Exception' }}
+                  </p>
+                  <p class="text-xs text-slate-500 dark:text-slate-400">
+                    <span v-if="entry.scope === 'global'">Applies to all layers that respect exceptions.</span>
+                    <span v-else>
+                      Applies to:
+                      {{
+                        entry.targetLayerKeys
+                          .map((key) => {
+                            const layer = layerOptions.find((l) => l.key === key)
+                            return layer ? layer.name : key
+                          })
+                          .join(', ')
+                      }}
+                    </span>
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  class="ml-4 text-xs font-medium text-slate-500 transition hover:text-slate-900 dark:text-slate-300 dark:hover:text-white"
+                  @click="handleRemoveExceptionEntry(entry.id)"
+                  :disabled="submitting"
+                >
+                  Remove
+                </button>
+              </li>
+            </ul>
+          </div>
+        </section>
+
         <footer class="flex flex-col gap-3 sm:flex-row sm:justify-end">
           <button
             type="button"
@@ -305,6 +591,7 @@ function toggleLayerSelection(option: LayerOption) {
             type="submit"
             class="inline-flex w-full items-center justify-center rounded-xl bg-gradient-to-r from-blue-600 to-indigo-500 px-4 py-2 text-sm font-semibold text-white shadow-lg transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
             :disabled="!isValid || submitting"
+            @click.prevent="handleSubmit"
           >
             <span v-if="submitting">Creating…</span>
             <span v-else>Save calendar</span>

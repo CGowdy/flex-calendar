@@ -7,12 +7,16 @@ const props = defineProps<{
 }>()
 
 const emit = defineEmits<{
-  (event: 'submit', payload: { name: string; color: string }): void
+  (
+    event: 'submit',
+    payload: { name: string; color: string; kind: 'standard' | 'exception' }
+  ): void
   (event: 'cancel'): void
 }>()
 
 const name = ref('')
 const color = ref('#2563eb')
+const isExceptionLayer = ref(false)
 
 watch(
   () => props.submitting,
@@ -20,6 +24,7 @@ watch(
     if (prev && !next) {
       name.value = ''
       color.value = '#2563eb'
+      isExceptionLayer.value = false
     }
   }
 )
@@ -29,7 +34,11 @@ function handleSubmit() {
   if (!trimmed || props.submitting) {
     return
   }
-  emit('submit', { name: trimmed, color: color.value })
+  emit('submit', {
+    name: trimmed,
+    color: color.value,
+    kind: isExceptionLayer.value ? 'exception' : 'standard',
+  })
 }
 </script>
 
@@ -67,6 +76,26 @@ function handleSubmit() {
         :disabled="submitting"
         class="h-9 w-12 cursor-pointer rounded-lg border border-slate-200 bg-transparent p-0 dark:border-slate-600"
       />
+    </label>
+
+    <label
+      class="flex items-start gap-3 rounded-2xl border border-slate-200/80 bg-white/95 px-3 py-3 text-sm font-semibold text-slate-600 shadow-sm transition dark:border-slate-600 dark:bg-slate-800/90 dark:text-slate-200"
+    >
+      <input
+        v-model="isExceptionLayer"
+        type="checkbox"
+        :disabled="submitting"
+        class="mt-1 h-4 w-4 rounded border-slate-300 text-brand focus:ring-brand dark:border-slate-500"
+      />
+      <span class="flex flex-col gap-1 text-left">
+        <span class="font-semibold text-slate-700 dark:text-slate-100">
+          Treat as exception layer
+        </span>
+        <span class="text-xs font-normal text-slate-500 dark:text-slate-400">
+          Exception layers store blocked dates (holidays, blackout days) so other tracks auto-skip
+          them.
+        </span>
+      </span>
     </label>
 
     <p v-if="errorMessage" class="text-sm text-red-500">

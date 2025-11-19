@@ -14,6 +14,10 @@ export interface ScheduledItem {
   notes: string
   durationDays: number
   metadata: Record<string, unknown>
+  targetLayerKeys?: string[]
+  splitGroupId?: string
+  splitIndex?: number
+  splitTotal?: number
 }
 
 type ScheduledItemWithInternalIds = Omit<ScheduledItem, '_id'> & {
@@ -66,6 +70,22 @@ const ScheduledItemSchema = new Schema<ScheduledItem>(
       type: Schema.Types.Mixed as Schema['obj']['metadata'],
       default: () => ({}),
     } as unknown as ScheduledItem['metadata'],
+    targetLayerKeys: {
+      type: [String],
+      default: undefined,
+    },
+    splitGroupId: {
+      type: String,
+      default: undefined,
+    },
+    splitIndex: {
+      type: Number,
+      default: undefined,
+    },
+    splitTotal: {
+      type: Number,
+      default: undefined,
+    },
   },
   {
     _id: false,
@@ -80,6 +100,7 @@ export interface CalendarLayer {
   autoShift: boolean
   description: string
   kind?: 'standard' | 'exception'
+  respectsGlobalExceptions?: boolean
 }
 
 const CalendarLayerSchema = new Schema<CalendarLayer>(
@@ -112,6 +133,10 @@ const CalendarLayerSchema = new Schema<CalendarLayer>(
       type: String,
       enum: ['standard', 'exception'],
       default: 'standard',
+    },
+    respectsGlobalExceptions: {
+      type: Boolean,
+      default: true,
     },
   },
   {

@@ -2,17 +2,25 @@ import type { FastifyInstance } from 'fastify'
 import { z } from 'zod'
 
 import {
+  addScheduledItemSchema,
   calendarIdParamsSchema,
   createCalendarSchema,
   shiftScheduledItemsSchema,
+  splitScheduledItemSchema,
+  unsplitScheduledItemSchema,
   updateCalendarSchema,
+  updateExceptionsSchema,
 } from '../schemas/calendarSchemas.js'
 import {
+  addScheduledItem,
   createCalendar,
   getCalendarById,
   listCalendars,
   shiftScheduledItems,
+  splitScheduledItem,
+  unsplitScheduledItem,
   updateCalendar,
+  updateExceptions,
 } from '../services/calendarService.js'
 
 export async function calendarsRoutes(app: FastifyInstance) {
@@ -55,6 +63,46 @@ export async function calendarsRoutes(app: FastifyInstance) {
       throw app.httpErrors.notFound('Calendar or day not found')
     }
 
+    return calendar
+  })
+
+  app.patch('/:calendarId/exceptions', async (request) => {
+    const { calendarId } = calendarIdParamsSchema.parse(request.params)
+    const body = updateExceptionsSchema.parse(request.body)
+    const calendar = await updateExceptions(calendarId, body)
+    if (!calendar) {
+      throw app.httpErrors.notFound('Calendar not found')
+    }
+    return calendar
+  })
+
+  app.post('/:calendarId/split', async (request) => {
+    const { calendarId } = calendarIdParamsSchema.parse(request.params)
+    const body = splitScheduledItemSchema.parse(request.body)
+    const calendar = await splitScheduledItem(calendarId, body)
+    if (!calendar) {
+      throw app.httpErrors.notFound('Calendar or scheduled item not found')
+    }
+    return calendar
+  })
+
+  app.post('/:calendarId/unsplit', async (request) => {
+    const { calendarId } = calendarIdParamsSchema.parse(request.params)
+    const body = unsplitScheduledItemSchema.parse(request.body)
+    const calendar = await unsplitScheduledItem(calendarId, body)
+    if (!calendar) {
+      throw app.httpErrors.notFound('Calendar or split group not found')
+    }
+    return calendar
+  })
+
+  app.post('/:calendarId/events', async (request) => {
+    const { calendarId } = calendarIdParamsSchema.parse(request.params)
+    const body = addScheduledItemSchema.parse(request.body)
+    const calendar = await addScheduledItem(calendarId, body)
+    if (!calendar) {
+      throw app.httpErrors.notFound('Calendar not found')
+    }
     return calendar
   })
 

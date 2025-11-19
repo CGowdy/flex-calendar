@@ -92,6 +92,18 @@ export interface CalendarEvent {
 
   /** Arbitrary metadata for domain-specific needs (tags, subject codes, etc.). */
   metadata?: Record<string, unknown>
+
+  /** Identifier shared by split parts of the same logical item. */
+  splitGroupId?: string
+
+  /** Index of this part within the split group (1-based). */
+  splitIndex?: number
+
+  /** Total number of parts for this split group. */
+  splitTotal?: number
+
+  /** Which layers this exception entry blocks (applicable for exception layers). */
+  targetLayerKeys?: string[]
 }
 
 /**
@@ -141,6 +153,13 @@ export interface CalendarLayer {
    * Exception layers are typically used to store holidays, sick days, etc.
    */
   kind: LayerKind
+
+  /**
+   * When true, this layer should honor globally-scoped exception events when generating
+   * or reflowing dates. Layers can opt out (false) to ignore global exceptions unless
+   * explicitly targeted by an exception event.
+   */
+  respectsGlobalExceptions?: boolean
 }
 
 /**
@@ -251,8 +270,18 @@ export interface CreateCalendarLayerInput {
   /** Optional layer kind; defaults to 'standard' if omitted. */
   kind?: LayerKind
 
+  /** Whether this layer should honor globally-scoped exception events. Defaults to true. */
+  respectsGlobalExceptions?: boolean
+
   /** Optional template generation config used at creation time. */
   templateConfig?: LayerTemplateConfig
+}
+
+export interface InitialExceptionInput {
+  date: string
+  title?: string
+  targetLayerKeys?: string[]
+  layerKey?: string
 }
 
 /**
@@ -281,6 +310,11 @@ export interface CreateCalendarRequest {
 
   /** Layers to create within this calendar. */
   layers?: CreateCalendarLayerInput[]
+  /**
+   * Optional exception entries to seed immediately after creation.
+   * These will also be respected when generating initial items.
+   */
+  initialExceptions?: InitialExceptionInput[]
 
   /**
    * Optional per-layer template items for initial population.
@@ -311,6 +345,28 @@ export interface ShiftScheduledItemsRequest {
 }
 
 /**
+ * Request payload to split an event into multiple parts.
+ */
+export interface SplitScheduledItemRequest {
+  scheduledItemId: string
+  parts?: number
+}
+
+export interface CreateScheduledItemRequest {
+  layerKey: string
+  date: string
+  title: string
+  description?: string
+  notes?: string
+  durationDays?: number
+}
+
+export interface UnsplitScheduledItemRequest {
+  scheduledItemId?: string
+  splitGroupId?: string
+}
+
+/**
  * Partial update for calendar configuration and layers.
  *
  * NOTE:
@@ -333,4 +389,20 @@ export interface UpdateCalendarRequest {
 
   /** See Calendar.includeExceptions. */
   includeExceptions?: boolean
+}
+
+/**
+ * Request payload to add/remove exception dates for a calendar.
+ *
+ * Dates should be ISO date strings (YYYY-MM-DD). Time components are ignored.
+ */
+export interface UpdateExceptionsRequest {
+  addEntries?: Array<{
+    date: string
+    title?: string
+    targetLayerKeys?: string[]
+  }>
+  removeDates?: string[]
+  removeEntryIds?: string[]
+  layerKey?: string // defaults to 'exceptions'
 }
