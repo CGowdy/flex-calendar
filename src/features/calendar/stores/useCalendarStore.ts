@@ -5,8 +5,12 @@ import {
   createCalendar,
   fetchCalendarById,
   fetchCalendars,
+  createScheduledItem as apiCreateScheduledItem,
   shiftScheduledItems,
   updateCalendarMeta,
+  updateExceptions as apiUpdateExceptions,
+  splitScheduledItem as apiSplitScheduledItem,
+  unsplitScheduledItem as apiUnsplitScheduledItem,
 } from '@api/calendarApi'
 import type {
   Calendar,
@@ -14,6 +18,10 @@ import type {
   CalendarSummary,
   CreateCalendarRequest,
   ShiftScheduledItemsRequest,
+  UpdateExceptionsRequest,
+  SplitScheduledItemRequest,
+  CreateScheduledItemRequest,
+  UnsplitScheduledItemRequest,
 } from '@/features/calendar/types/calendar'
 import { useScheduleAdjuster } from '../composables/useScheduleAdjuster'
 
@@ -291,6 +299,102 @@ export const useCalendarStore = defineStore('calendar', () => {
     }
   }
 
+  async function updateExceptions(
+    payload: UpdateExceptionsRequest
+  ): Promise<Calendar | null> {
+    if (!activeCalendar.value || !activeCalendarId.value) {
+      return null
+    }
+    isLoading.value = true
+    errorMessage.value = null
+    try {
+      const updated = await apiUpdateExceptions(activeCalendarId.value, payload)
+      activeCalendar.value = updated
+      calendars.value = calendars.value.map((summary) =>
+        summary.id === updated.id ? updated : summary
+      )
+      return updated
+    } catch (error) {
+      errorMessage.value =
+        error instanceof Error ? error.message : 'Failed to update exceptions'
+      throw error
+    } finally {
+      isLoading.value = false
+    }
+  }
+
+  async function splitScheduledItem(
+    payload: SplitScheduledItemRequest
+  ): Promise<Calendar | null> {
+    if (!activeCalendar.value || !activeCalendarId.value) {
+      return null
+    }
+    isLoading.value = true
+    errorMessage.value = null
+    try {
+      const updated = await apiSplitScheduledItem(activeCalendarId.value, payload)
+      activeCalendar.value = updated
+      calendars.value = calendars.value.map((summary) =>
+        summary.id === updated.id ? updated : summary
+      )
+      return updated
+    } catch (error) {
+      errorMessage.value =
+        error instanceof Error ? error.message : 'Failed to split scheduled item'
+      throw error
+    } finally {
+      isLoading.value = false
+    }
+  }
+
+  async function addScheduledItem(
+    payload: CreateScheduledItemRequest
+  ): Promise<Calendar | null> {
+    if (!activeCalendar.value || !activeCalendarId.value) {
+      return null
+    }
+    isLoading.value = true
+    errorMessage.value = null
+    try {
+      const updated = await apiCreateScheduledItem(activeCalendarId.value, payload)
+      activeCalendar.value = updated
+      calendars.value = calendars.value.map((summary) =>
+        summary.id === updated.id ? updated : summary
+      )
+      return updated
+    } catch (error) {
+      errorMessage.value =
+        error instanceof Error ? error.message : 'Failed to add scheduled item'
+      throw error
+    } finally {
+      isLoading.value = false
+    }
+  }
+
+  async function unsplitScheduledItem(
+    payload: UnsplitScheduledItemRequest
+  ): Promise<Calendar | null> {
+    if (!activeCalendar.value || !activeCalendarId.value) {
+      return null
+    }
+    isLoading.value = true
+    errorMessage.value = null
+    try {
+      const updated = await apiUnsplitScheduledItem(activeCalendarId.value, payload)
+      activeCalendar.value = updated
+      calendars.value = calendars.value.map((summary) =>
+        summary.id === updated.id ? updated : summary
+      )
+      return updated
+    } catch (error) {
+      errorMessage.value =
+        error instanceof Error ? error.message : 'Failed to merge split parts'
+      throw error
+    } finally {
+      isLoading.value = false
+    }
+  }
+
   return {
     calendars,
     calendarsLoaded,
@@ -311,6 +415,10 @@ export const useCalendarStore = defineStore('calendar', () => {
     persistLayerColor,
     schedulePersistLayerColor,
     createLayerForActiveCalendar,
+    updateExceptions,
+    splitScheduledItem,
+    addScheduledItem,
+    unsplitScheduledItem,
   }
 })
 

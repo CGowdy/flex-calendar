@@ -18,12 +18,34 @@ export const layerSchema = z.object({
   chainBehavior: chainBehaviorEnum.optional(),
   autoShift: z.boolean().optional(), // legacy compatibility
   kind: layerKindEnum.optional().default('standard'),
+  respectsGlobalExceptions: z.boolean().optional(),
   // Optional event title pattern used during generation, supports "{n}" placeholder.
   titlePattern: z.string().optional(),
   templateConfig: layerTemplateSchema.optional(),
 })
 
 export type LayerInput = z.infer<typeof layerSchema>
+
+const exceptionEntrySchema = z.object({
+  date: z.string().min(1),
+  title: z.string().optional(),
+  targetLayerKeys: z.array(z.string().min(1)).optional(),
+})
+
+const initialExceptionEntrySchema = exceptionEntrySchema.extend({
+  layerKey: z.string().optional(),
+})
+
+export const addScheduledItemSchema = z.object({
+  layerKey: z.string().min(1),
+  date: z.string().min(1),
+  title: z.string().min(1),
+  description: z.string().optional(),
+  notes: z.string().optional(),
+  durationDays: z.coerce.number().int().min(1).optional(),
+})
+
+export type AddScheduledItemInput = z.infer<typeof addScheduledItemSchema>
 
 export const createCalendarSchema = z.object({
   name: z.string().min(1),
@@ -44,6 +66,7 @@ export const createCalendarSchema = z.object({
       )
     )
     .optional(),
+  initialExceptions: z.array(initialExceptionEntrySchema).optional(),
 })
 
 export type CreateCalendarInput = z.infer<typeof createCalendarSchema>
@@ -82,6 +105,7 @@ export const updateCalendarSchema = z.object({
         chainBehavior: chainBehaviorEnum.optional(),
         autoShift: z.boolean().optional(),
         kind: layerKindEnum.optional(),
+        respectsGlobalExceptions: z.boolean().optional(),
       })
     )
     .optional(),
@@ -90,4 +114,33 @@ export const updateCalendarSchema = z.object({
 })
 
 export type UpdateCalendarInput = z.infer<typeof updateCalendarSchema>
+
+// Exceptions CRUD payload
+export const updateExceptionsSchema = z.object({
+  addEntries: z.array(exceptionEntrySchema).optional().default([]),
+  removeDates: z.array(z.string().min(1)).optional().default([]),
+  removeEntryIds: z.array(z.string().min(1)).optional().default([]),
+  layerKey: z.string().optional().default('exceptions'),
+})
+
+export type UpdateExceptionsInput = z.input<typeof updateExceptionsSchema>
+
+export const splitScheduledItemSchema = z.object({
+  scheduledItemId: z.string().min(1),
+  parts: z.coerce.number().int().min(2).max(6).optional().default(2),
+})
+
+export type SplitScheduledItemInput = z.infer<typeof splitScheduledItemSchema>
+
+export const unsplitScheduledItemSchema = z
+  .object({
+    scheduledItemId: z.string().min(1).optional(),
+    splitGroupId: z.string().min(1).optional(),
+  })
+  .refine(
+    (value) => Boolean(value.scheduledItemId ?? value.splitGroupId),
+    'scheduledItemId or splitGroupId is required'
+  )
+
+export type UnsplitScheduledItemInput = z.infer<typeof unsplitScheduledItemSchema>
 

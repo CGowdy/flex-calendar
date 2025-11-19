@@ -18,11 +18,14 @@ const props = defineProps<{
 const emit = defineEmits<{
   (event: 'close'): void
   (event: 'shift', payload: ShiftScheduledItemsRequest): void
+  (event: 'split', payload: { scheduledItemId: string; parts: number }): void
+  (event: 'unsplit', payload: { scheduledItemId?: string; splitGroupId?: string }): void
 }>()
 
 const state = reactive({
   shiftByDays: 1,
   layerSelections: [] as string[],
+  splitParts: 2,
 })
 
 const layerOptions = computed(() => props.calendar?.layers ?? [])
@@ -32,12 +35,14 @@ watch(
   (day) => {
     if (!day) {
       state.layerSelections = []
+      state.splitParts = 2
       return
     }
     const defaults = new Set(props.linkedLayerKeys)
     defaults.add(day.layerKey)
     state.layerSelections = Array.from(defaults)
     state.shiftByDays = 1
+    state.splitParts = 2
   },
   { immediate: true }
 )
@@ -67,6 +72,27 @@ function handleSubmit() {
     scheduledItemId: props.day.id,
     shiftByDays: state.shiftByDays,
     layerKeys: state.layerSelections,
+  })
+}
+
+function handleSplit() {
+  if (!props.day || props.busy) return
+  if (state.splitParts < 2) {
+    state.splitParts = 2
+  }
+  emit('split', {
+    scheduledItemId: props.day.id,
+    parts: state.splitParts,
+  })
+}
+
+function handleUnsplit() {
+  if (!props.day || props.busy || !props.day.splitGroupId) {
+    return
+  }
+  emit('unsplit', {
+    scheduledItemId: props.day.id,
+    splitGroupId: props.day.splitGroupId,
   })
 }
 </script>
@@ -194,6 +220,57 @@ function handleSubmit() {
             >
               <span v-if="busy">Updating…</span>
               <span v-else>Apply shift</span>
+            </button>
+          </form>
+        </article>
+
+        <article class="space-y-4 rounded-2xl border border-slate-200 bg-white/95 p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900/80">
+          <header class="space-y-1">
+            <h3 class="text-base font-semibold text-slate-900 dark:text-white">Split event</h3>
+            <p class="text-sm text-slate-500 dark:text-slate-400">
+              Break this event into consecutive parts. Each part becomes its own item and pushes the
+              rest of the layer forward.
+            </p>
+          </header>
+
+          <div
+            v-if="day?.splitTotal && (day?.splitTotal ?? 1) > 1"
+            class="space-y-3 rounded-xl border border-dashed border-slate-300 px-3 py-3 text-sm text-slate-500 dark:border-slate-600 dark:text-slate-300"
+          >
+            <p>
+              This event is already split (Part {{ day?.splitIndex }} of {{ day?.splitTotal }}).
+            </p>
+            <button
+              type="button"
+              class="inline-flex items-center justify-center rounded-xl border border-transparent bg-emerald-600 px-4 py-2 text-sm font-semibold text-white shadow-md transition hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-60"
+              :disabled="busy"
+              @click="handleUnsplit"
+            >
+              Merge split parts
+            </button>
+          </div>
+          <form
+            v-else
+            class="flex flex-col gap-3 text-sm text-slate-600 dark:text-slate-300"
+            @submit.prevent="handleSplit"
+          >
+            <label class="flex items-center gap-3">
+              <span class="w-32 text-slate-500 dark:text-slate-400">Number of parts</span>
+              <input
+                v-model.number="state.splitParts"
+                type="number"
+                min="2"
+                max="6"
+                :disabled="busy"
+                class="flex-1 rounded-xl border border-slate-200 bg-white px-3 py-2 text-base text-slate-900 shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+              />
+            </label>
+            <button
+              type="submit"
+              class="ml-auto inline-flex items-center justify-center rounded-xl border border-transparent bg-violet-600 px-4 py-2 text-sm font-semibold text-white shadow-md transition hover:bg-violet-500 disabled:cursor-not-allowed disabled:opacity-60"
+              :disabled="busy || state.splitParts < 2"
+            >
+              Split into {{ state.splitParts }} parts
             </button>
           </form>
         </article>

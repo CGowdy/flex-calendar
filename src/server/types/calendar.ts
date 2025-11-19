@@ -11,6 +11,10 @@ export interface CalendarEventDTO {
   notes: string
   durationDays: number
   metadata: Record<string, unknown>
+  targetLayerKeys?: string[]
+  splitGroupId?: string
+  splitIndex?: number
+  splitTotal?: number
 }
 
 export interface CalendarLayerDTO {
@@ -20,6 +24,14 @@ export interface CalendarLayerDTO {
   description: string
   chainBehavior: ChainBehavior
   kind: LayerKind
+  respectsGlobalExceptions: boolean
+}
+
+export interface InitialExceptionInput {
+  date: string
+  title?: string
+  targetLayerKeys?: string[]
+  layerKey?: string
 }
 
 export interface CalendarDTO {

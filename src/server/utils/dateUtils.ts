@@ -12,39 +12,93 @@ export function isWeekend(date: Date): boolean {
 /**
  * Normalizes a date to midnight UTC for comparison purposes.
  */
-function normalizeDate(date: Date): string {
+export function normalizeDate(date: Date): string {
   const d = new Date(date)
   return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}-${String(d.getUTCDate()).padStart(2, '0')}`
 }
 
-/**
- * Checks if a date is a holiday by comparing against a set of holiday dates.
- */
-export function isHoliday(
-  date: Date,
-  holidayDates: Set<string>
-): boolean {
-  return holidayDates.has(normalizeDate(date))
+export function normalizeDateInput(input: Date | string): string {
+  const date = typeof input === 'string' ? new Date(input) : input
+  return normalizeDate(date)
 }
 
 /**
- * Gets the set of holiday dates from scheduled items belonging to exception layers.
+ * Checks if a date is blocked (exception) by comparing against a set of blocked dates.
  */
-export function getHolidayDates(
-  items: Array<{ date: Date | string; layerKey: string }>
-): Set<string> {
-  const holidaySet = new Set<string>()
+export function isBlockedDate(
+  date: Date,
+  blockedDates: Set<string>
+): boolean {
+  return blockedDates.has(normalizeDate(date))
+}
+
+export interface ExceptionLookup {
+  global: Set<string>
+  perLayer: Record<string, Set<string>>
+}
+
+export function buildExceptionLookup({
+  items,
+  exceptionLayerKeys,
+}: {
+  items: Array<{ date: Date | string; layerKey: string; targetLayerKeys?: string[] }>
+  exceptionLayerKeys: Set<string>
+}): ExceptionLookup {
+  const lookup: ExceptionLookup = {
+    global: new Set<string>(),
+    perLayer: {},
+  }
+
   for (const item of items) {
-    if (
-      item.layerKey === 'holidays' ||
-      item.layerKey === 'exceptions'
-    ) {
-      const date =
-        typeof item.date === 'string' ? new Date(item.date) : item.date
-      holidaySet.add(normalizeDate(date))
+    if (!exceptionLayerKeys.has(item.layerKey)) {
+      continue
+    }
+
+    const dateKey = normalizeDateInput(item.date)
+    const targets =
+      item.targetLayerKeys && item.targetLayerKeys.length > 0
+        ? item.targetLayerKeys
+        : null
+
+    if (!targets) {
+      lookup.global.add(dateKey)
+      continue
+    }
+
+    for (const target of targets) {
+      if (!lookup.perLayer[target]) {
+        lookup.perLayer[target] = new Set<string>()
+      }
+      lookup.perLayer[target]!.add(dateKey)
     }
   }
-  return holidaySet
+
+  return lookup
+}
+
+export function getBlockedDatesForLayer(
+  layerKey: string,
+  lookup: ExceptionLookup,
+  respectsGlobal: boolean
+): Set<string> | undefined {
+  const perLayerSet = lookup.perLayer[layerKey]
+  if (!respectsGlobal && !perLayerSet) {
+    return undefined
+  }
+  if (!respectsGlobal) {
+    return perLayerSet
+  }
+
+  if (lookup.global.size === 0 && !perLayerSet) {
+    return undefined
+  }
+
+  const combined = new Set<string>()
+  lookup.global.forEach((value) => combined.add(value))
+  if (perLayerSet) {
+    perLayerSet.forEach((value) => combined.add(value))
+  }
+  return combined
 }
 
 /**
@@ -53,12 +107,12 @@ export function getHolidayDates(
 export function nextSchoolDate(
   currentDate: Date,
   includeWeekends: boolean,
-  holidayDates?: Set<string>
+  blockedDates?: Set<string>
 ): Date {
   let candidate = new Date(currentDate)
 
   // If weekends are included and no holidays, return as-is
-  if (includeWeekends && (!holidayDates || holidayDates.size === 0)) {
+  if (includeWeekends && (!blockedDates || blockedDates.size === 0)) {
     return candidate
   }
 
@@ -70,8 +124,8 @@ export function nextSchoolDate(
       continue
     }
 
-    // Skip holidays if provided
-    if (holidayDates && isHoliday(candidate, holidayDates)) {
+    // Skip blocked dates if provided
+    if (blockedDates && isBlockedDate(candidate, blockedDates)) {
       candidate = addDays(candidate, 1)
       continue
     }
@@ -97,13 +151,13 @@ export function generateValidSchoolDates(
   startDate: Date,
   count: number,
   includeWeekends: boolean,
-  holidayDates?: Set<string>
+  blockedDates?: Set<string>
 ): Date[] {
   const dates: Date[] = []
   let cursor = new Date(startDate)
 
   for (let i = 0; i < count; i++) {
-    const validDate = nextSchoolDate(cursor, includeWeekends, holidayDates)
+    const validDate = nextSchoolDate(cursor, includeWeekends, blockedDates)
     dates.push(new Date(validDate))
     // Start next iteration from the day after the valid date
     cursor = addDays(validDate, 1)
@@ -116,7 +170,7 @@ export function countValidDaySpan(
   startDate: Date,
   endDate: Date,
   includeWeekends: boolean,
-  holidayDates?: Set<string>
+  blockedDates?: Set<string>
 ): number {
   const startTime = startDate.getTime()
   const endTime = endDate.getTime()
@@ -138,7 +192,7 @@ export function countValidDaySpan(
   let guard = 0
 
   while (guard < 2000) {
-    const next = nextSchoolDate(cursor, includeWeekends, holidayDates)
+    const next = nextSchoolDate(cursor, includeWeekends, blockedDates)
     steps += 1
     if (normalizeDate(next) === targetKey) {
       return steps
@@ -154,7 +208,7 @@ export function addValidSchoolDays(
   date: Date,
   steps: number,
   includeWeekends: boolean,
-  holidayDates?: Set<string>
+  blockedDates?: Set<string>
 ): Date {
   if (steps <= 0) {
     return new Date(date)
@@ -164,7 +218,7 @@ export function addValidSchoolDays(
   let cursor = addDays(result, 1)
 
   for (let i = 0; i < steps; i++) {
-    result = nextSchoolDate(cursor, includeWeekends, holidayDates)
+    result = nextSchoolDate(cursor, includeWeekends, blockedDates)
     cursor = addDays(result, 1)
   }
 

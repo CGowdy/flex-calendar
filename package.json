@@ -28,7 +28,11 @@
     "format": "prettier --write src/",
     "test:unit": "vitest",
     "test:server": "vitest --config vitest.server.config.ts",
+    "test:unit:watch": "vitest --watch",
+    "test:server:watch": "vitest --config vitest.server.config.ts --watch",
     "test": "run-p test:unit",
+    "test:e2e:watch": "bunx playwright test -c playwright.config.ts --watch",
+    "test:ct:watch": "bunx playwright test -c playwright-ct.config.ts --watch",
     "seed:sample": "tsx src/server/scripts/seedSampleCalendar.ts",
     "start:server": "node dist/server/index.js",
     "start:server:bun": "bun dist/server/index.js"

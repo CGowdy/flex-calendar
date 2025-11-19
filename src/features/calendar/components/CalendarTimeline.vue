@@ -58,7 +58,18 @@ function handlePopoverHide() {
   formInstanceKey.value += 1
 }
 
-async function handleLayerSubmit(payload: { name: string; color: string }) {
+function handlePopoverCancel() {
+  if (isCreatingLayer.value) {
+    return
+  }
+  quickAddPopover.value?.hide()
+}
+
+async function handleLayerSubmit(payload: {
+  name: string
+  color: string
+  kind: 'standard' | 'exception'
+}) {
   if (isCreatingLayer.value) return
   layerError.value = null
   isCreatingLayer.value = true
@@ -66,6 +77,8 @@ async function handleLayerSubmit(payload: { name: string; color: string }) {
     await store.createLayerForActiveCalendar({
       name: payload.name,
       color: payload.color,
+      kind: payload.kind,
+      chainBehavior: payload.kind === 'exception' ? 'independent' : 'linked',
     })
     quickAddPopover.value?.hide()
     quickAddOpen.value = false
@@ -161,7 +174,7 @@ function formatDate(date: Date | null): string {
                 :submitting="isCreatingLayer"
                 :error-message="layerError"
                 @submit="handleLayerSubmit"
-                @cancel="handlePopoverHide"
+                @cancel="handlePopoverCancel"
               />
             </div>
           </Popover>
