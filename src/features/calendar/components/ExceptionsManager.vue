@@ -38,7 +38,7 @@ const exceptionEntries = computed(() =>
     .map((item) => ({
       id: item.id,
       layerKey: item.layerKey,
-      date: typeof item.date === 'string' ? item.date : item.date.toString(),
+      date: item.date,
       title: item.title,
       targetLayerKeys: item.targetLayerKeys ?? [],
     }))

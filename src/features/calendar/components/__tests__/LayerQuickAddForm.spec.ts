@@ -16,7 +16,10 @@ describe('LayerQuickAddForm', () => {
     await user.type(screen.getByLabelText(/Layer name/i), 'Content Plan')
     await user.click(screen.getByRole('button', { name: /Add layer/i }))
 
-    expect(emitted().submit?.[0]?.[0]).toMatchObject({
+    const events = emitted()
+    const submitEvents = events.submit as Array<[Record<string, unknown>]> | undefined
+
+    expect(submitEvents?.[0]?.[0]).toMatchObject({
       name: 'Content Plan',
       color: '#2563eb',
       kind: 'standard',
@@ -31,7 +34,10 @@ describe('LayerQuickAddForm', () => {
     await user.type(screen.getByLabelText(/Layer name/i), 'Holidays')
     await user.click(screen.getByRole('button', { name: /Add layer/i }))
 
-    expect(emitted().submit?.[0]?.[0]).toMatchObject({
+    const events = emitted()
+    const submitEvents = events.submit as Array<[Record<string, unknown>]> | undefined
+
+    expect(submitEvents?.[0]?.[0]).toMatchObject({
       name: 'Holidays',
       kind: 'exception',
     })

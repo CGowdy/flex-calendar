@@ -1,6 +1,13 @@
 import { MongoMemoryServer } from 'mongodb-memory-server'
 import type { FastifyInstance } from 'fastify'
 
+declare global {
+
+  var __E2E_MEMORY_SERVER__: MongoMemoryServer | undefined
+
+  var __E2E_API_SERVER__: FastifyInstance | undefined
+}
+
 let memoryServer: MongoMemoryServer
 let apiServer: FastifyInstance
 
@@ -31,8 +38,8 @@ async function globalSetup() {
   console.log(`[E2E Global Setup] API server started at ${address}`)
 
   // Store references for teardown
-  ;(global as any).__E2E_MEMORY_SERVER__ = memoryServer
-  ;(global as any).__E2E_API_SERVER__ = apiServer
+  global.__E2E_MEMORY_SERVER__ = memoryServer
+  global.__E2E_API_SERVER__ = apiServer
 }
 
 export default globalSetup

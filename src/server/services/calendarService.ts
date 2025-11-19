@@ -482,7 +482,7 @@ export async function updateExceptions(
       if (items.length === 0) continue
 
       // Find first item on/after the changed date
-      let startIdx = items.findIndex(
+      const startIdx = items.findIndex(
         (i) => new Date(i.date).getTime() >= minChangedDate.getTime()
       )
       if (startIdx === -1) continue

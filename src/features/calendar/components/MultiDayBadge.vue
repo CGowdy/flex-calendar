@@ -97,7 +97,7 @@ const computedStyle = computed(() => {
   }
 })
 
-const ghostStyle = computed(() => {
+const ghostStyleOverrides = computed(() => {
   if (!props.isGhost) return {}
   if (props.ghostStyle === 'dashed') {
     return {
@@ -120,7 +120,7 @@ const ghostStyle = computed(() => {
     :is="componentTag"
     v-bind="attrs"
     :class="[baseClasses, shapeClasses, isGhost ? 'justify-center' : 'justify-start']"
-    :style="[computedStyle, ghostStyle]"
+    :style="[computedStyle, ghostStyleOverrides]"
     :draggable="props.isGhost ? undefined : attrs.draggable"
   >
     <span

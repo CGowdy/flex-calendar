@@ -1,12 +1,18 @@
+import type { FastifyInstance } from 'fastify'
+import type { MongoMemoryServer } from 'mongodb-memory-server'
+
+declare global {
+
+  var __E2E_API_SERVER__: FastifyInstance | undefined
+
+  var __E2E_MEMORY_SERVER__: MongoMemoryServer | undefined
+}
+
 async function globalTeardown() {
   console.log('[E2E Global Teardown] Shutting down...')
 
-  const apiServer = (global as any).__E2E_API_SERVER__ as
-    | { close: () => Promise<void> }
-    | undefined
-  const memoryServer = (global as any).__E2E_MEMORY_SERVER__ as
-    | { stop: () => Promise<void> }
-    | undefined
+  const apiServer = global.__E2E_API_SERVER__
+  const memoryServer = global.__E2E_MEMORY_SERVER__
 
   if (apiServer) {
     console.log('[E2E Global Teardown] Closing API server...')

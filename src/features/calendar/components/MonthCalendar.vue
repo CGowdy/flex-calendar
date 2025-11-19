@@ -253,7 +253,6 @@ const segmentedItems = computed<SegmentedItem[]>(() => {
 })
 
 const laneAssignments = computed(() => {
-  const lanes: number[] = []
   const laneEndTimes: number[] = []
   const sorted = [...segmentedItems.value].sort((a, b) => {
     const startDiff = a.startDate.getTime() - b.startDate.getTime()
@@ -267,7 +266,7 @@ const laneAssignments = computed(() => {
     let lane = 0
     while (
       laneEndTimes[lane] !== undefined &&
-      item.startDate.getTime() <= laneEndTimes[lane]
+      item.startDate.getTime() <= laneEndTimes[lane]!
     ) {
       lane++
     }
@@ -289,7 +288,6 @@ const displayItemsByDate = computed<Record<string, DisplayItem[]>>(() => {
     const lane = laneAssignments.value.get(item.base.id) ?? 0
     item.segments.forEach((segment, segmentIndex) => {
       const segmentStart = parseIsoDate(segment.startDateIso)
-      const hasPrevRealSegment = item.segments.slice(0, segmentIndex).some((seg) => !seg.isGap)
       const hasLaterRealSegment = item.segments.slice(segmentIndex + 1).some((seg) => !seg.isGap)
       for (let dayOffset = 0; dayOffset < segment.spanDays; dayOffset++) {
         const currentDate = addDays(segmentStart, dayOffset)
