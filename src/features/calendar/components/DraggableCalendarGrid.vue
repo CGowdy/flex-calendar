@@ -43,11 +43,10 @@ const groupedItems = computed(() => {
   return groups
 })
 
-function formatDate(iso: string): string {
-  return new Intl.DateTimeFormat(undefined, {
-    month: 'short',
-    day: 'numeric',
-  }).format(new Date(iso))
+import { formatDate } from '@/features/calendar/composables/useDateUtils'
+
+function formatDateDisplay(iso: string): string {
+  return formatDate(iso, { month: 'short', day: 'numeric' })
 }
 
 function handleShift(item: ScheduledItem, delta: number) {
@@ -61,10 +60,11 @@ function handleShift(item: ScheduledItem, delta: number) {
 
 <template>
   <div class="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
-    <section
+    <Card
       v-for="[layerKey, items] in groupedItems"
       :key="layerKey"
-      class="flex max-h-[70vh] flex-col gap-3 overflow-y-auto rounded-2xl border border-slate-200 bg-white/95 p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900"
+      padding="md"
+      class="flex max-h-[70vh] flex-col gap-3 overflow-y-auto"
     >
       <header>
         <h3 class="text-base font-semibold text-slate-900 dark:text-white">
@@ -95,7 +95,7 @@ function handleShift(item: ScheduledItem, delta: number) {
             >
               <div class="flex w-full items-center justify-between gap-2">
                 <span class="text-sm font-semibold text-slate-900 dark:text-white">{{ item.title }}</span>
-                <span class="text-xs text-slate-500 dark:text-slate-400">{{ formatDate(item.date) }}</span>
+                <span class="text-xs text-slate-500 dark:text-slate-400">{{ formatDateDisplay(item.date) }}</span>
               </div>
 
               <p v-if="item.description" class="text-sm text-slate-600 dark:text-slate-300">
@@ -126,7 +126,7 @@ function handleShift(item: ScheduledItem, delta: number) {
           </article>
         </li>
       </ul>
-    </section>
+    </Card>
   </div>
 </template>
 

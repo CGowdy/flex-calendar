@@ -47,14 +47,11 @@ watch(
   { immediate: true }
 )
 
-function formatDate(iso: string | undefined): string {
+import { formatDate } from '@/features/calendar/composables/useDateUtils'
+
+function formatDateDisplay(iso: string | undefined): string {
   if (!iso) return '—'
-  return new Intl.DateTimeFormat(undefined, {
-    weekday: 'short',
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-  }).format(new Date(iso))
+  return formatDate(iso, { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })
 }
 
 function handleShift(sign: number) {
@@ -116,7 +113,7 @@ function handleUnsplit() {
         <div>
           <h2 class="text-lg font-semibold text-slate-900 dark:text-white">{{ day!.title }}</h2>
           <p class="text-sm text-slate-500 dark:text-slate-400">
-            {{ formatDate(day!.date) }} · Layer:
+            {{ formatDateDisplay(day!.date) }} · Layer:
             <span class="font-medium text-slate-700 dark:text-slate-200">
               {{ calendar?.layers.find((layer) => layer.key === day!.layerKey)?.name ?? day!.layerKey }}
             </span>
@@ -134,8 +131,9 @@ function handleUnsplit() {
       </header>
 
       <section class="flex-1 space-y-6 overflow-y-auto pr-1">
-        <article class="space-y-3 rounded-2xl border border-slate-200 bg-white/95 p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900/80">
-          <h3 class="text-base font-semibold text-slate-900 dark:text-white">Event details</h3>
+        <Card padding="md" class="space-y-3">
+          <div>
+            <h3 class="text-base font-semibold text-slate-900 dark:text-white">Event details</h3>
           <div class="space-y-2 text-sm text-slate-600 dark:text-slate-300">
             <div>
               <p class="text-xs uppercase tracking-[0.3em] text-slate-400">Title</p>
@@ -147,12 +145,13 @@ function handleUnsplit() {
               Notes: {{ day!.notes }}
             </p>
           </div>
-          <span class="text-xs font-semibold uppercase tracking-[0.25em] text-blue-600 dark:text-blue-300">
-            Duration: {{ day!.durationDays ?? 1 }} day{{ (day!.durationDays ?? 1) === 1 ? '' : 's' }}
-          </span>
-        </article>
+            <span class="text-xs font-semibold uppercase tracking-[0.25em] text-blue-600 dark:text-blue-300">
+              Duration: {{ day!.durationDays ?? 1 }} day{{ (day!.durationDays ?? 1) === 1 ? '' : 's' }}
+            </span>
+          </div>
+        </Card>
 
-        <article class="space-y-5 rounded-2xl border border-slate-200 bg-white/95 p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900/80">
+        <Card padding="md" class="space-y-5">
           <header class="space-y-1">
             <h3 class="text-base font-semibold text-slate-900 dark:text-white">Reschedule items</h3>
             <p class="text-sm text-slate-500 dark:text-slate-400">
@@ -161,36 +160,35 @@ function handleUnsplit() {
           </header>
 
           <div class="flex flex-col gap-2 sm:flex-row">
-            <button
-              type="button"
-              class="flex-1 rounded-full border border-blue-200 bg-blue-50 px-3 py-2 text-xs font-semibold text-blue-700 transition hover:bg-blue-100 disabled:cursor-not-allowed disabled:opacity-50 dark:border-blue-400/60 dark:bg-blue-500/10 dark:text-blue-100"
+            <Button
+              variant="secondary"
+              size="sm"
+              class="flex-1 rounded-full border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100 dark:border-blue-400/60 dark:bg-blue-500/10 dark:text-blue-100"
               :disabled="busy"
               @click="handleShift(-1)"
             >
               Move up 1 day
-            </button>
-            <button
-              type="button"
-              class="flex-1 rounded-full border border-blue-200 bg-blue-50 px-3 py-2 text-xs font-semibold text-blue-700 transition hover:bg-blue-100 disabled:cursor-not-allowed disabled:opacity-50 dark:border-blue-400/60 dark:bg-blue-500/10 dark:text-blue-100"
+            </Button>
+            <Button
+              variant="secondary"
+              size="sm"
+              class="flex-1 rounded-full border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100 dark:border-blue-400/60 dark:bg-blue-500/10 dark:text-blue-100"
               :disabled="busy"
               @click="handleShift(1)"
             >
               Delay 1 day
-            </button>
+            </Button>
           </div>
 
           <form class="flex flex-col gap-4" @submit.prevent="handleSubmit">
-            <label class="flex flex-col gap-2 text-sm font-semibold text-slate-600 dark:text-slate-200">
-              <span>Shift by (days)</span>
-              <input
-                v-model.number="state.shiftByDays"
-                type="number"
-                min="-30"
-                max="30"
-                :disabled="busy"
-                class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-base text-slate-900 shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-              />
-            </label>
+            <FormInput
+              v-model.number="state.shiftByDays"
+              type="number"
+              label="Shift by (days)"
+              :min="-30"
+              :max="30"
+              :disabled="busy"
+            />
 
             <fieldset class="space-y-3 rounded-xl border border-slate-200/80 p-3 dark:border-slate-700/70">
               <legend class="px-1 text-xs font-semibold uppercase tracking-[0.3em] text-slate-400">Layer adjustments</legend>
@@ -213,18 +211,19 @@ function handleUnsplit() {
               </ul>
             </fieldset>
 
-            <button
+            <Button
               type="submit"
-              class="ml-auto inline-flex items-center justify-center rounded-xl bg-gradient-to-r from-blue-600 to-indigo-500 px-4 py-2 text-sm font-semibold text-white shadow-lg transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-60"
+              variant="primary"
+              class="ml-auto"
               :disabled="busy || state.shiftByDays === 0"
             >
               <span v-if="busy">Updating…</span>
               <span v-else>Apply shift</span>
-            </button>
+            </Button>
           </form>
-        </article>
+        </Card>
 
-        <article class="space-y-4 rounded-2xl border border-slate-200 bg-white/95 p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900/80">
+        <Card padding="md" class="space-y-4">
           <header class="space-y-1">
             <h3 class="text-base font-semibold text-slate-900 dark:text-white">Split event</h3>
             <p class="text-sm text-slate-500 dark:text-slate-400">
@@ -240,40 +239,38 @@ function handleUnsplit() {
             <p>
               This event is already split (Part {{ day?.splitIndex }} of {{ day?.splitTotal }}).
             </p>
-            <button
-              type="button"
-              class="inline-flex items-center justify-center rounded-xl border border-transparent bg-emerald-600 px-4 py-2 text-sm font-semibold text-white shadow-md transition hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-60"
+            <Button
+              variant="primary"
+              class="bg-emerald-600 hover:bg-emerald-500"
               :disabled="busy"
               @click="handleUnsplit"
             >
               Merge split parts
-            </button>
+            </Button>
           </div>
           <form
             v-else
             class="flex flex-col gap-3 text-sm text-slate-600 dark:text-slate-300"
             @submit.prevent="handleSplit"
           >
-            <label class="flex items-center gap-3">
-              <span class="w-32 text-slate-500 dark:text-slate-400">Number of parts</span>
-              <input
-                v-model.number="state.splitParts"
-                type="number"
-                min="2"
-                max="6"
-                :disabled="busy"
-                class="flex-1 rounded-xl border border-slate-200 bg-white px-3 py-2 text-base text-slate-900 shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-              />
-            </label>
-            <button
+            <FormInput
+              v-model.number="state.splitParts"
+              type="number"
+              label="Number of parts"
+              :min="2"
+              :max="6"
+              :disabled="busy"
+            />
+            <Button
               type="submit"
-              class="ml-auto inline-flex items-center justify-center rounded-xl border border-transparent bg-violet-600 px-4 py-2 text-sm font-semibold text-white shadow-md transition hover:bg-violet-500 disabled:cursor-not-allowed disabled:opacity-60"
+              variant="primary"
+              class="ml-auto bg-violet-600 hover:bg-violet-500"
               :disabled="busy || state.splitParts < 2"
             >
               Split into {{ state.splitParts }} parts
-            </button>
+            </Button>
           </form>
-        </article>
+        </Card>
       </section>
     </aside>
   </Transition>

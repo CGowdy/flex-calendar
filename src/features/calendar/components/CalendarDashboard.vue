@@ -18,6 +18,13 @@ import DayDetailDrawer from './DayDetailDrawer.vue'
 import AddEventModal from './AddEventModal.vue'
 import CalendarQuickAddForm from './CalendarQuickAddForm.vue'
 import PrintView from './PrintView.vue'
+import ErrorMessage from './ui/ErrorMessage.vue'
+import CalendarSelector from './ui/CalendarSelector.vue'
+import ViewModeSelector from './ui/ViewModeSelector.vue'
+import Button from './ui/Button.vue'
+import FormInput from './ui/FormInput.vue'
+import Card from './ui/Card.vue'
+import EmptyState from './ui/EmptyState.vue'
 import type {
   Calendar,
   CreateCalendarRequest,
@@ -35,8 +42,6 @@ const {
   visibleLayerKeys,
   linkedLayerKeys,
 } = storeToRefs(calendarStore)
-
-const CREATE_CALENDAR_OPTION = '__create__'
 
 const showSetupWizard = ref(false)
 const showQuickAdd = ref(false)
@@ -151,19 +156,15 @@ function closeQuickAdd() {
   }
 }
 
-async function handleCalendarChange(event: Event) {
-  const target = event.target as HTMLSelectElement
-  const nextId = target.value
-  if (nextId === CREATE_CALENDAR_OPTION) {
-    showSetupWizard.value = false
-    showQuickAdd.value = false
-    inlineCalendarName.value = ''
-    inlineCalendarError.value = null
-    showInlineCreate.value = true
-    target.value = activeCalendarId.value ?? ''
-    return
-  }
+function handleCalendarCreate() {
+  showSetupWizard.value = false
+  showQuickAdd.value = false
+  inlineCalendarName.value = ''
+  inlineCalendarError.value = null
+  showInlineCreate.value = true
+}
 
+async function handleCalendarSelect(nextId: string | null) {
   showInlineCreate.value = false
   inlineCalendarError.value = null
   inlineCalendarName.value = ''
@@ -340,103 +341,67 @@ function closeAddEventModal() {
         </p>
       </div>
       <div class="flex flex-wrap items-center gap-3">
-        <select
+        <CalendarSelector
           v-if="hasCalendars"
-          class="min-w-[220px] rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
-          :value="activeCalendarId ?? ''"
+          :calendars="calendars"
+          :selected-id="activeCalendarId"
           :disabled="isBusy"
-          @change="handleCalendarChange"
-        >
-          <option value="" disabled>Select a calendar</option>
-          <option
-            v-for="calendar in calendars"
-            :key="calendar.id"
-            :value="calendar.id"
-          >
-            {{ calendar.name }}
-          </option>
-          <option :value="CREATE_CALENDAR_OPTION">
-            + Create new calendar…
-          </option>
-        </select>
+          @update:selected-id="(id) => handleCalendarSelect(id)"
+          @create="handleCalendarCreate"
+        />
 
-        <button
-          type="button"
-          class="inline-flex items-center rounded-xl border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800/70"
-          :disabled="isBusy"
-          @click="openSetupWizard"
-        >
+        <Button variant="secondary" :disabled="isBusy" @click="openSetupWizard">
           Use Setup Wizard
-        </button>
+        </Button>
       </div>
     </section>
 
-    <section
+    <Card
       v-if="showInlineCreate"
-      class="rounded-2xl border border-slate-200/80 bg-white/95 p-5 shadow-sm dark:border-slate-700/70 dark:bg-slate-900"
+      padding="lg"
     >
       <form
         class="flex w-full max-w-md flex-col gap-4"
         @submit.prevent="handleInlineCreateSubmit"
       >
-        <label class="flex flex-col gap-2 text-sm font-semibold text-slate-600 dark:text-slate-200">
-          <span>Calendar name</span>
-          <input
-            v-model="inlineCalendarName"
-            type="text"
-            :disabled="isSubmitting"
-            placeholder="Roadmap 2025"
-            aria-label="New calendar name"
-            class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-base text-slate-900 shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-          />
-        </label>
+        <FormInput
+          v-model="inlineCalendarName"
+          type="text"
+          label="Calendar name"
+          placeholder="Roadmap 2025"
+          :disabled="isSubmitting"
+          required
+          :error="inlineCalendarError"
+        />
 
         <div class="flex flex-wrap justify-end gap-3">
-          <button
-            type="button"
-            class="inline-flex items-center rounded-xl border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800/70"
-            :disabled="isSubmitting"
-            @click="cancelInlineCreate"
-          >
+          <Button variant="secondary" :disabled="isSubmitting" @click="cancelInlineCreate">
             Cancel
-          </button>
-          <button
+          </Button>
+          <Button
             type="submit"
-            class="inline-flex items-center rounded-xl bg-gradient-to-r from-blue-600 to-indigo-500 px-4 py-2 font-semibold text-white shadow-md transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-60"
+            variant="primary"
             :disabled="isSubmitting || inlineCalendarName.trim().length === 0"
           >
             <span v-if="isSubmitting">Creating…</span>
             <span v-else>Create calendar</span>
-          </button>
+          </Button>
         </div>
-
-        <p
-          v-if="inlineCalendarError"
-          class="text-sm text-[#b91c1c]"
-        >
-          {{ inlineCalendarError }}
-        </p>
       </form>
-    </section>
+    </Card>
 
-    <section
+    <Card
       v-if="showQuickAdd && !hasCalendars"
-      class="rounded-2xl border border-slate-200/80 bg-white/95 p-4 shadow-sm dark:border-slate-700/70 dark:bg-slate-900"
+      padding="md"
     >
       <CalendarQuickAddForm
         :submitting="isSubmitting"
         @submit="handleQuickAddSubmit"
         @cancel="closeQuickAdd"
       />
-    </section>
+    </Card>
 
-    <div
-      v-if="errorMessage"
-      class="rounded-xl border border-red-200/50 bg-red-100/60 px-4 py-3 text-red-700"
-      role="alert"
-    >
-      {{ errorMessage }}
-    </div>
+    <ErrorMessage v-if="errorMessage" :message="errorMessage" />
 
     <section
       v-if="selectedCalendar"
@@ -453,65 +418,17 @@ function closeAddEventModal() {
 
       <div class="flex flex-col gap-3">
         <div class="flex flex-wrap items-center justify-between gap-3">
-          <div class="inline-flex gap-2">
-            <button
-              type="button"
-              class="rounded-lg border border-slate-200 bg-white px-3 py-1 text-sm text-slate-600 transition hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800/70"
-              :class="{ 'border-blue-500 bg-blue-50 text-blue-700 dark:border-blue-400 dark:bg-blue-500/20 dark:text-blue-100': viewMode === 'month' }"
-              @click="viewMode = 'month'"
-            >
-              Month
-            </button>
-            <button
-              type="button"
-              class="rounded-lg border border-slate-200 bg-white px-3 py-1 text-sm text-slate-600 transition hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800/70"
-              :class="{ 'border-blue-500 bg-blue-50 text-blue-700 dark:border-blue-400 dark:bg-blue-500/20 dark:text-blue-100': viewMode === 'week' }"
-              @click="viewMode = 'week'"
-            >
-              Week
-            </button>
-            <button
-              type="button"
-              class="rounded-lg border border-slate-200 bg-white px-3 py-1 text-sm text-slate-600 transition hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800/70"
-              :class="{ 'border-blue-500 bg-blue-50 text-blue-700 dark:border-blue-400 dark:bg-blue-500/20 dark:text-blue-100': viewMode === 'day' }"
-              @click="viewMode = 'day'"
-            >
-              Day
-            </button>
-            <button
-              type="button"
-              class="rounded-lg border border-slate-200 bg-white px-3 py-1 text-sm text-slate-600 transition hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800/70"
-              :class="{ 'border-blue-500 bg-blue-50 text-blue-700 dark:border-blue-400 dark:bg-blue-500/20 dark:text-blue-100': viewMode === 'board' }"
-              @click="viewMode = 'board'"
-            >
-              Board
-            </button>
-          </div>
+          <ViewModeSelector v-model="viewMode" />
           <div class="flex flex-wrap gap-2">
-            <button
-              type="button"
-              class="inline-flex items-center rounded-xl border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800/70"
-              :disabled="isBusy || !selectedCalendar"
-              @click="handleRequestAddEvent()"
-            >
+            <Button variant="secondary" :disabled="isBusy || !selectedCalendar" @click="handleRequestAddEvent()">
               Add Event
-            </button>
-            <button
-              type="button"
-              class="inline-flex items-center rounded-xl border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800/70"
-              :disabled="isBusy"
-              @click="openExceptionsManager"
-            >
+            </Button>
+            <Button variant="secondary" :disabled="isBusy" @click="openExceptionsManager">
               Manage Exceptions
-            </button>
-            <button
-              type="button"
-              class="inline-flex items-center rounded-xl border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800/70"
-              :disabled="isBusy || !selectedCalendar"
-              @click="handlePrintView"
-            >
+            </Button>
+            <Button variant="secondary" :disabled="isBusy || !selectedCalendar" @click="handlePrintView">
               Print View
-            </button>
+            </Button>
           </div>
         <div class="flex flex-wrap items-center gap-3 text-xs text-slate-500 dark:text-slate-400">
           <span>Ghost style:</span>
@@ -580,33 +497,21 @@ function closeAddEventModal() {
       </div>
     </section>
 
-    <section
+    <EmptyState
       v-else-if="!isLoading"
-      class="flex flex-col items-center justify-center gap-4 rounded-2xl border border-dashed border-slate-300 bg-slate-50/60 p-12 text-center text-slate-600 dark:border-slate-600 dark:bg-slate-900/60 dark:text-slate-300"
+      description="Start by creating your first calendar. Use quick add for defaults or the setup wizard if you want the guided experience."
     >
-      <p>
-        Start by creating your first calendar. Use quick add for defaults or the
-        setup wizard if you want the guided experience.
-      </p>
-      <div class="flex flex-wrap justify-center gap-3">
-        <button
-          type="button"
-          class="inline-flex items-center rounded-xl bg-gradient-to-r from-blue-600 to-indigo-500 px-4 py-2 font-semibold text-white shadow-md transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-60"
-          :disabled="isBusy"
-          @click="openQuickAdd"
-        >
-          Open Quick Add
-        </button>
-        <button
-          type="button"
-          class="inline-flex items-center rounded-xl border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800/70"
-          :disabled="isBusy"
-          @click="openSetupWizard"
-        >
-          Use Setup Wizard
-        </button>
-      </div>
-    </section>
+      <template #action>
+        <div class="flex flex-wrap justify-center gap-3">
+          <Button variant="primary" :disabled="isBusy" @click="openQuickAdd">
+            Open Quick Add
+          </Button>
+          <Button variant="secondary" :disabled="isBusy" @click="openSetupWizard">
+            Use Setup Wizard
+          </Button>
+        </div>
+      </template>
+    </EmptyState>
 
     <div
       v-if="isBusy"

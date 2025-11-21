@@ -4,6 +4,13 @@ import { computed, ref, watch } from 'vue'
 import { useCalendarStore } from '@stores/useCalendarStore'
 import type { Calendar } from '@/features/calendar/types/calendar'
 import type { UpdateExceptionsRequest } from '@/features/calendar/types/calendar'
+import Modal from './ui/Modal.vue'
+import Card from './ui/Card.vue'
+import Button from './ui/Button.vue'
+import FormInput from './ui/FormInput.vue'
+import EmptyState from './ui/EmptyState.vue'
+import ErrorMessage from './ui/ErrorMessage.vue'
+import { formatDate } from '@/features/calendar/composables/useDateUtils'
 
 const props = defineProps<{
   calendar: Calendar
@@ -120,46 +127,24 @@ async function handleRemove(entryId: string, layerKey: string) {
 </script>
 
 <template>
-  <transition name="fade">
-    <div
-      v-if="open"
-      class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/70 px-4 py-8"
-      role="dialog"
-      aria-modal="true"
+  <Modal
+    :open="open"
+    title="Manage Exceptions"
+    description="Add blackout days that all or specific layers should skip. Entries are stored inside the selected exception layer."
+    size="xl"
+    :busy="submitting"
+    @close="emit('close')"
+  >
+    <EmptyState
+      v-if="exceptionLayers.length === 0"
+      title="No exception layers available."
     >
-      <div class="relative flex w-full max-w-4xl flex-col gap-6 rounded-3xl bg-white p-6 shadow-2xl dark:bg-slate-900">
-        <header class="flex items-start justify-between gap-3">
-          <div>
-            <h2 className="text-2xl font-semibold text-slate-900 dark:text-white">Manage Exceptions</h2>
-            <p class="text-sm text-slate-500 dark:text-slate-400">
-              Add blackout days that all or specific layers should skip. Entries are stored inside
-              the selected exception layer.
-            </p>
-          </div>
-          <button
-            type="button"
-            class="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-transparent text-slate-500 transition hover:border-slate-200 hover:bg-slate-100 dark:text-slate-300 dark:hover:border-slate-700 dark:hover:bg-slate-800/70"
-            :disabled="submitting"
-            @click="emit('close')"
-            aria-label="Close exception manager"
-          >
-            ✕
-          </button>
-        </header>
+      Add a layer with kind <strong>exception</strong> in the setup wizard or calendar
+      settings to start tracking blocked dates.
+    </EmptyState>
 
-        <section
-          v-if="exceptionLayers.length === 0"
-          class="rounded-xl border border-dashed border-slate-300 bg-slate-50/60 p-6 text-sm text-slate-600 dark:border-slate-700 dark:bg-slate-900/60 dark:text-slate-300"
-        >
-          <p class="font-medium">No exception layers available.</p>
-          <p class="mt-2">
-            Add a layer with kind <strong>exception</strong> in the setup wizard or calendar
-            settings to start tracking blocked dates.
-          </p>
-        </section>
-
-        <div v-else class="grid gap-6 md:grid-cols-[minmax(320px,360px)_1fr]">
-          <section class="rounded-2xl border border-slate-200/80 bg-white/95 p-5 dark:border-slate-700/70 dark:bg-slate-900">
+    <div v-else class="grid gap-6 md:grid-cols-[minmax(320px,360px)_1fr]">
+      <Card padding="lg">
             <form class="flex flex-col gap-4" @submit.prevent="handleSubmit">
               <label class="flex flex-col gap-2 text-sm font-semibold text-slate-600 dark:text-slate-200">
                 <span>Exception layer</span>
@@ -178,28 +163,23 @@ async function handleRemove(entryId: string, layerKey: string) {
                 </select>
               </label>
 
-              <label class="flex flex-col gap-2 text-sm font-semibold text-slate-600 dark:text-slate-200">
-                <span>Date</span>
-                <input
-                  v-model="dateInput"
-                  type="date"
-                  class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                  :max="new Date().getFullYear() + 5 + '-12-31'"
-                  :disabled="submitting"
-                  required
-                />
-              </label>
+              <FormInput
+                v-model="dateInput"
+                type="date"
+                label="Date"
+                :max="new Date().getFullYear() + 5 + '-12-31'"
+                :disabled="submitting"
+                required
+                :error="formError && !dateInput ? 'Date is required' : null"
+              />
 
-              <label class="flex flex-col gap-2 text-sm font-semibold text-slate-600 dark:text-slate-200">
-                <span>Label (optional)</span>
-                <input
-                  v-model="titleInput"
-                  type="text"
-                  placeholder="E.g., Winter Break"
-                  class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                  :disabled="submitting"
-                />
-              </label>
+              <FormInput
+                v-model="titleInput"
+                type="text"
+                label="Label (optional)"
+                placeholder="E.g., Winter Break"
+                :disabled="submitting"
+              />
 
               <fieldset class="space-y-2 rounded-xl border border-slate-200/80 p-3 dark:border-slate-700/70">
                 <legend class="px-1 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
@@ -247,22 +227,20 @@ async function handleRemove(entryId: string, layerKey: string) {
                 </div>
               </fieldset>
 
-              <p v-if="formError" class="text-sm text-red-600 dark:text-red-400">
-                {{ formError }}
-              </p>
+              <ErrorMessage :message="formError" />
 
-              <button
+              <Button
                 type="submit"
-                class="inline-flex items-center justify-center rounded-xl bg-gradient-to-r from-blue-600 to-indigo-500 px-4 py-2 font-semibold text-white shadow-lg transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-60"
+                variant="primary"
                 :disabled="submitting"
               >
                 <span v-if="submitting">Saving…</span>
                 <span v-else>Add exception date</span>
-              </button>
+              </Button>
             </form>
-          </section>
+      </Card>
 
-          <section class="rounded-2xl border border-slate-200/80 bg-white/95 p-5 dark:border-slate-700/70 dark:bg-slate-900">
+      <Card padding="lg">
             <h3 class="text-lg font-semibold text-slate-900 dark:text-white">
               Existing exceptions
             </h3>
@@ -271,9 +249,11 @@ async function handleRemove(entryId: string, layerKey: string) {
               list the layers they target.
             </p>
 
-            <div v-if="exceptionEntries.length === 0" class="mt-4 rounded-xl border border-dashed border-slate-300 p-4 text-sm text-slate-500 dark:border-slate-700 dark:text-slate-400">
-              No exception dates yet. Add one using the form on the left.
-            </div>
+            <EmptyState
+              v-if="exceptionEntries.length === 0"
+              description="No exception dates yet. Add one using the form on the left."
+              class="mt-4"
+            />
 
             <ul v-else class="mt-4 space-y-3 max-h-[360px] overflow-y-auto pr-2">
               <li
@@ -283,7 +263,7 @@ async function handleRemove(entryId: string, layerKey: string) {
               >
                 <div>
                   <p class="font-semibold text-slate-800 dark:text-slate-100">
-                    {{ new Date(entry.date).toLocaleDateString(undefined, { dateStyle: 'medium' }) }}
+                    {{ formatDate(entry.date, { dateStyle: 'medium' }) }}
                   </p>
                   <p class="text-slate-600 dark:text-slate-300">
                     {{ entry.title || 'Exception' }}
@@ -303,20 +283,18 @@ async function handleRemove(entryId: string, layerKey: string) {
                     </span>
                   </p>
                 </div>
-                <button
-                  type="button"
-                  class="inline-flex items-center rounded-lg border border-transparent px-2 py-1 text-xs font-medium text-slate-500 transition hover:border-slate-200 hover:bg-slate-100 dark:text-slate-300 dark:hover:border-slate-600 dark:hover:bg-slate-700"
+                <Button
+                  variant="ghost"
+                  size="sm"
                   :disabled="submitting"
                   @click="handleRemove(entry.id, entry.layerKey)"
                 >
                   Remove
-                </button>
+                </Button>
               </li>
             </ul>
-          </section>
-        </div>
-      </div>
+      </Card>
     </div>
-  </transition>
+  </Modal>
 </template>
 

@@ -4,6 +4,10 @@ import type {
   Calendar,
   CreateScheduledItemRequest,
 } from '@/features/calendar/types/calendar'
+import Modal from './ui/Modal.vue'
+import FormInput from './ui/FormInput.vue'
+import Button from './ui/Button.vue'
+import ErrorMessage from './ui/ErrorMessage.vue'
 
 const props = defineProps<{
   calendar: Calendar
@@ -80,137 +84,89 @@ function handleSubmit() {
 </script>
 
 <template>
-  <transition name="fade">
-    <div
-      v-if="open"
-      class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/70 px-4 py-8"
-      role="dialog"
-      aria-modal="true"
-    >
-      <div class="w-full max-w-lg rounded-3xl bg-white p-6 shadow-2xl dark:bg-slate-900">
-        <header class="mb-4 flex items-center justify-between">
-          <div>
-            <h2 class="text-xl font-semibold text-slate-900 dark:text-white">Add event</h2>
-            <p class="text-sm text-slate-500 dark:text-slate-400">
-              Choose a layer, pick the day, and describe the event.
-            </p>
-          </div>
-          <button
-            type="button"
-            class="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-transparent text-slate-500 transition hover:border-slate-200 hover:bg-slate-100 dark:text-slate-300 dark:hover:border-slate-700 dark:hover:bg-slate-800/70 disabled:cursor-not-allowed disabled:opacity-60"
-            :disabled="busy"
-            @click="emit('close')"
-            aria-label="Close add event form"
+  <Modal
+    :open="open"
+    title="Add event"
+    description="Choose a layer, pick the day, and describe the event."
+    size="md"
+    :busy="busy"
+    @close="emit('close')"
+  >
+    <form class="space-y-4" @submit.prevent="handleSubmit">
+      <label class="flex flex-col gap-2 text-sm font-semibold text-slate-600 dark:text-slate-200">
+        <span>Layer</span>
+        <select
+          v-model="form.layerKey"
+          :disabled="busy || availableLayers.length === 0"
+          class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-base text-slate-900 shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+        >
+          <option
+            v-for="layer in availableLayers"
+            :key="layer.key"
+            :value="layer.key"
           >
-            ✕
-          </button>
-        </header>
+            {{ layer.name }}
+          </option>
+        </select>
+      </label>
 
-        <form class="space-y-4" @submit.prevent="handleSubmit">
-          <label class="flex flex-col gap-2 text-sm font-semibold text-slate-600 dark:text-slate-200">
-            <span>Layer</span>
-            <select
-              v-model="form.layerKey"
-              :disabled="busy || availableLayers.length === 0"
-              class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-base text-slate-900 shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-            >
-              <option
-                v-for="layer in availableLayers"
-                :key="layer.key"
-                :value="layer.key"
-              >
-                {{ layer.name }}
-              </option>
-            </select>
-          </label>
+      <FormInput
+        v-model="form.date"
+        type="date"
+        label="Date"
+        :disabled="busy"
+        :error="formError.message && !form.date ? 'Date is required' : null"
+      />
 
-          <label class="flex flex-col gap-2 text-sm font-semibold text-slate-600 dark:text-slate-200">
-            <span>Date</span>
-            <input
-              v-model="form.date"
-              type="date"
-              :disabled="busy"
-              class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-base text-slate-900 shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-            />
-          </label>
+      <FormInput
+        v-model="form.title"
+        type="text"
+        label="Title"
+        placeholder="Event title"
+        :disabled="busy"
+        required
+        :error="formError.message && !form.title.trim() ? 'Title is required' : null"
+      />
 
-          <label class="flex flex-col gap-2 text-sm font-semibold text-slate-600 dark:text-slate-200">
-            <span>Title</span>
-            <input
-              v-model="form.title"
-              type="text"
-              placeholder="Event title"
-              :disabled="busy"
-              class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-base text-slate-900 shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-            />
-          </label>
+      <FormInput
+        v-model="form.description"
+        type="text"
+        label="Description (optional)"
+        :rows="2"
+        :disabled="busy"
+      />
 
-          <label class="flex flex-col gap-2 text-sm font-semibold text-slate-600 dark:text-slate-200">
-            <span>Description (optional)</span>
-            <textarea
-              v-model="form.description"
-              rows="2"
-              :disabled="busy"
-              class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-base text-slate-900 shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-            />
-          </label>
+      <FormInput
+        v-model="form.notes"
+        type="text"
+        label="Notes (optional)"
+        :rows="2"
+        :disabled="busy"
+      />
 
-          <label class="flex flex-col gap-2 text-sm font-semibold text-slate-600 dark:text-slate-200">
-            <span>Notes (optional)</span>
-            <textarea
-              v-model="form.notes"
-              rows="2"
-              :disabled="busy"
-              class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-base text-slate-900 shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-            />
-          </label>
-
-          <label class="flex flex-col gap-2 text-sm font-semibold text-slate-600 dark:text-slate-200">
-            <span>Duration (days)</span>
-            <input
-              v-model.number="form.durationDays"
-              type="number"
-              min="1"
-              :disabled="busy"
-              class="w-32 rounded-xl border border-slate-200 bg-white px-3 py-2 text-base text-slate-900 shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-            />
-          </label>
-
-          <p v-if="formError.message" class="text-sm text-red-500">{{ formError.message }}</p>
-
-          <div class="flex justify-end gap-3">
-            <button
-              type="button"
-              class="inline-flex items-center rounded-xl border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800/70"
-              :disabled="busy"
-              @click="emit('close')"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              class="inline-flex items-center rounded-xl bg-gradient-to-r from-blue-600 to-indigo-500 px-4 py-2 text-sm font-semibold text-white shadow-md transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-60"
-              :disabled="busy"
-            >
-              <span v-if="busy">Saving…</span>
-              <span v-else>Save event</span>
-            </button>
-          </div>
-        </form>
+      <div class="flex flex-col gap-2">
+        <FormInput
+          v-model.number="form.durationDays"
+          type="number"
+          label="Duration (days)"
+          :min="1"
+          :disabled="busy"
+        />
       </div>
-    </div>
-  </transition>
-</template>
 
-<style scoped>
-.fade-enter-active,
-.fade-leave-active {
-  transition: opacity 0.2s ease;
-}
-.fade-enter-from,
-.fade-leave-to {
-  opacity: 0;
-}
-</style>
+      <ErrorMessage :message="formError.message" />
+
+      <div class="flex justify-end gap-3">
+        <Button variant="secondary" :disabled="busy" @click="emit('close')">
+          Cancel
+        </Button>
+        <Button type="submit" variant="primary" :disabled="busy">
+          <span v-if="busy">Saving…</span>
+          <span v-else>Save event</span>
+        </Button>
+      </div>
+    </form>
+  </Modal>
+</template>
 
 

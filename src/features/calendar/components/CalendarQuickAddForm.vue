@@ -98,10 +98,11 @@ function handleSubmit() {
 </script>
 
 <template>
-  <form
-    class="flex w-full flex-col gap-5 rounded-2xl border border-slate-200/80 bg-white/95 p-5 text-slate-900 shadow-elevated dark:border-slate-700/70 dark:bg-slate-900"
-    @submit.prevent="handleSubmit"
-  >
+  <Card padding="lg" class="flex w-full flex-col gap-5 text-slate-900">
+    <form
+      class="flex w-full flex-col gap-5"
+      @submit.prevent="handleSubmit"
+    >
     <header class="flex items-start justify-between gap-3">
       <div class="space-y-1.5">
         <p class="text-xs font-semibold uppercase tracking-[0.3em] text-slate-500 dark:text-slate-400">
@@ -200,6 +201,7 @@ function handleSubmit() {
         <span v-else>Save calendar</span>
       </button>
     </footer>
-  </form>
+    </form>
+  </Card>
 </template>
 

@@ -112,21 +112,16 @@ const upcomingItems = computed<ScheduledItem[]>(() => {
   return future.slice(0, 6)
 })
 
+import { formatDate as formatDateUtil } from '@/features/calendar/composables/useDateUtils'
+
 function formatDate(date: Date | null): string {
-  if (!date) {
-    return '—'
-  }
-  return new Intl.DateTimeFormat(undefined, {
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-  }).format(date)
+  return formatDateUtil(date, { month: 'short', day: 'numeric', year: 'numeric' })
 }
 
 </script>
 
 <template>
-  <aside class="flex flex-col gap-5 rounded-2xl border border-slate-200 bg-white/95 p-5 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+  <Card padding="lg" class="flex flex-col gap-5">
     <header>
       <h2 class="text-lg font-semibold text-slate-900 dark:text-white">{{ calendar.name }}</h2>
       <p class="text-sm text-slate-500 dark:text-slate-400">
@@ -232,10 +227,12 @@ function formatDate(date: Date | null): string {
           </button>
         </li>
       </ul>
-      <p v-if="upcomingItems.length === 0" class="text-center text-sm text-slate-500 dark:text-slate-400">
-        You're ahead of schedule! No remaining items scheduled.
-      </p>
+      <EmptyState
+        v-if="upcomingItems.length === 0"
+        description="You're ahead of schedule! No remaining items scheduled."
+        class="text-center"
+      />
     </section>
-  </aside>
+  </Card>
 </template>
 
