@@ -5,7 +5,17 @@ import type {
   ScheduledItem,
   CalendarLayer,
 } from '@/features/calendar/types/calendar'
-import MultiDayBadge from './MultiDayBadge.vue'
+import CalendarNavigation from './ui/CalendarNavigation.vue'
+import CalendarDayCell from './ui/CalendarDayCell.vue'
+import {
+  dayKey,
+  parseIsoDate,
+  addDays,
+  normalizeDate,
+  startOfWeek,
+  isWeekendDay,
+} from '@/features/calendar/composables/useDateUtils'
+import { buildExceptionLookup } from '@/features/calendar/composables/useExceptionLookup'
 
 const props = defineProps<{
   calendar: Calendar
@@ -25,15 +35,6 @@ const emit = defineEmits<{
   (event: 'update:viewDate', d: Date): void
   (event: 'add-event', payload: { date: string }): void
 }>()
-
-const startOfWeek = (d: Date) => {
-  const date = new Date(d)
-  const day = date.getDay()
-  const diff = date.getDate() - day
-  date.setDate(diff)
-  date.setHours(0, 0, 0, 0)
-  return date
-}
 
 const visibleStart = ref(startOfWeek(props.viewDate ?? new Date()))
 watch(
@@ -73,16 +74,6 @@ function prevWeek() {
   visibleStart.value = startOfWeek(d)
 }
 
-function dayKey(d: Date) {
-  return d.toISOString().slice(0, 10)
-}
-
-function parseIsoDate(iso: string): Date {
-  const [year, month, day] = iso.split('-').map(Number)
-  const date = new Date(year ?? 0, (month ?? 1) - 1, day ?? 1)
-  date.setHours(0, 0, 0, 0)
-  return date
-}
 
 type DisplayItem = {
   segmentId: string
@@ -104,41 +95,6 @@ type DisplayItem = {
   globalOffset?: number
 }
 
-function addDays(date: Date, n: number): Date {
-  const d = new Date(date)
-  d.setDate(d.getDate() + n)
-  return d
-}
-
-const isWeekendDay = (day: number) => day === 0 || day === 6
-
-type ExceptionLookup = {
-  global: Set<string>
-  perLayer: Record<string, Set<string>>
-}
-
-function buildExceptionLookup(calendar: Calendar): ExceptionLookup {
-  const lookup: ExceptionLookup = {
-    global: new Set<string>(),
-    perLayer: {},
-  }
-  for (const item of calendar.scheduledItems) {
-    const layer = calendar.layers.find((entry) => entry.key === item.layerKey)
-    if (!layer || layer.kind !== 'exception') continue
-    const iso = dayKey(new Date(item.date))
-    const targets =
-      item.targetLayerKeys && item.targetLayerKeys.length > 0 ? item.targetLayerKeys : null
-    if (!targets) {
-      lookup.global.add(iso)
-    } else {
-      targets.forEach((target) => {
-        if (!lookup.perLayer[target]) lookup.perLayer[target] = new Set<string>()
-        lookup.perLayer[target]!.add(iso)
-      })
-    }
-  }
-  return lookup
-}
 
 const layersByKey = computed(() => {
   const map = new Map<string, CalendarLayer>()
@@ -268,11 +224,6 @@ type SegmentedItem = {
   totalSpan: number
 }
 
-function normalizeDate(date: Date): Date {
-  const d = new Date(date)
-  d.setHours(0, 0, 0, 0)
-  return d
-}
 
 const segmentedItems = computed<SegmentedItem[]>(() => {
   const includeWeekends = props.calendar.includeWeekends ?? true
@@ -415,25 +366,13 @@ const headerLabel = computed(() => {
 
 <template>
   <section class="flex flex-col gap-4">
-    <header class="flex items-center justify-between gap-3">
-      <button
-        type="button"
-        class="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 text-slate-600 transition hover:bg-slate-100 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800/70"
-        @click="prevWeek"
-        aria-label="Previous week"
-      >
-        ‹
-      </button>
-      <h3 class="text-lg font-semibold text-slate-900 dark:text-white">{{ headerLabel }}</h3>
-      <button
-        type="button"
-        class="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 text-slate-600 transition hover:bg-slate-100 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800/70"
-        @click="nextWeek"
-        aria-label="Next week"
-      >
-        ›
-      </button>
-    </header>
+    <CalendarNavigation
+      :label="headerLabel"
+      :prev-label="'Previous week'"
+      :next-label="'Next week'"
+      :on-prev="prevWeek"
+      :on-next="nextWeek"
+    />
 
     <div class="grid grid-cols-7 gap-px rounded-2xl bg-slate-200/70 p-px dark:bg-slate-700/60">
       <div
@@ -443,73 +382,29 @@ const headerLabel = computed(() => {
       >
         {{ d }}
       </div>
-      <template v-for="date in days" :key="date.toISOString()">
-        <div
-          class="group relative min-h-[140px] bg-white p-2 dark:bg-slate-900"
-          :data-date="dayKey(date)"
-        >
-          <div class="text-xs font-semibold text-slate-500 dark:text-slate-400">
-            {{ new Intl.DateTimeFormat(undefined, { month: 'short', day: 'numeric' }).format(date) }}
-          </div>
-          <button
-            type="button"
-            class="absolute right-2 top-2 hidden rounded-full border border-slate-200 bg-white px-1 text-xs font-semibold text-slate-500 shadow-sm transition hover:bg-slate-100 group-hover:inline-flex dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200"
-            @click.stop="emit('add-event', { date: dayKey(date) })"
-            aria-label="Add event"
-          >
-            +
-          </button>
-          <ul class="mt-1 flex h-full flex-col gap-1">
-            <li
-              v-for="display in (displayItemsByDate[dayKey(date)] ?? [])"
-              :key="display.segmentId"
-              class="relative flex"
-            >
-              <template v-if="display.isGap && !display.isPlaceholder">
-                <MultiDayBadge
-                  data-testid="blocked-gap"
-                  :data-gap-for="display.base.id"
-                  :label="display.base.title"
-                  :color="getLayerColor(display.base.layerKey)"
-                  width="100%"
-                  :show-label="false"
-                  :is-ghost="true"
-                  :ghost-style="ghostStyle"
-                  :connects-left="display.connectLeft ?? false"
-                  :connects-right="display.connectRight ?? false"
-                  :cell-gap-px="CELL_GAP_PX"
-                  :cell-padding-px="DAY_PADDING_PX"
-                />
-              </template>
-              <template v-else-if="!display.isPlaceholder">
-                <MultiDayBadge
-                  :label="display.base.title"
-                  :color="getLayerColor(display.base.layerKey)"
-                  width="100%"
-                  :show-label="display.showLabel ?? false"
-                  :is-ghost="false"
-                  :ghost-style="ghostStyle"
-                  :connects-left="display.connectLeft ?? false"
-                  :connects-right="display.connectRight ?? false"
-                  :is-selected="selectedDayId === display.base.id"
-                  :is-continuation="display.isContinuation"
-                  :cell-gap-px="CELL_GAP_PX"
-                  :cell-padding-px="DAY_PADDING_PX"
-                  :highlighted="hoveredEventId === display.base.id"
-                  :description="display.base.description"
-                  type="button"
-                  @click="emit('select-day', display.base.id)"
-                  @mouseenter="handleBadgeEnter(display.base.id)"
-                  @mouseleave="handleBadgeLeave(display.base.id)"
-                />
-              </template>
-              <template v-else>
-                <div class="h-7 w-full opacity-0 pointer-events-none" aria-hidden="true" />
-              </template>
-            </li>
-          </ul>
-        </div>
-      </template>
+      <CalendarDayCell
+        v-for="date in days"
+        :key="date.toISOString()"
+        :date="date"
+        :display-items="displayItemsByDate[dayKey(date)] ?? []"
+        :selected-day-id="selectedDayId"
+        :hovered-event-id="hoveredEventId"
+        :dragging-segment-id="null"
+        :is-dragging="false"
+        :drag-over-key="null"
+        :today-iso="new Date().toISOString().slice(0, 10)"
+        :is-same-month="true"
+        :visible-month="visibleStart"
+        :ghost-style="ghostStyle"
+        :cell-gap-px="CELL_GAP_PX"
+        :cell-padding-px="DAY_PADDING_PX"
+        :get-layer-color="getLayerColor"
+        class="min-h-[140px]"
+        @select-day="(dayId) => emit('select-day', dayId)"
+        @add-event="(payload) => emit('add-event', payload)"
+        @badge-enter="handleBadgeEnter"
+        @badge-leave="handleBadgeLeave"
+      />
     </div>
   </section>
 </template>

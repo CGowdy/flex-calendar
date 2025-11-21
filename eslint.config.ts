@@ -30,5 +30,14 @@ export default defineConfigWithVueTs(
     ...pluginVitest.configs.recommended,
     files: ['src/**/__tests__/*'],
   },
+  {
+    // Allow single-word component names in ui/ folder (common UI library pattern)
+    rules: {
+      'vue/multi-word-component-names': ['error', {
+        ignores: ['Button', 'Card', 'Modal', 'FormInput', 'ErrorMessage', 'EmptyState', 'CalendarNavigation', 'CalendarDayCell', 'ViewModeSelector', 'CalendarSelector'],
+      }],
+    },
+    files: ['src/**/ui/**/*.vue'],
+  },
   skipFormatting,
 )

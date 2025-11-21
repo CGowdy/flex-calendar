@@ -2,7 +2,19 @@
 import { computed, ref, watch } from 'vue'
 import type { Calendar, ScheduledItem, CalendarLayer } from '@/features/calendar/types/calendar'
 
-import MultiDayBadge from './MultiDayBadge.vue'
+import CalendarNavigation from './ui/CalendarNavigation.vue'
+import CalendarDayCell from './ui/CalendarDayCell.vue'
+import {
+  dayKey,
+  parseIsoDate,
+  addDays,
+  normalizeDate,
+  startOfMonth,
+  endOfMonth,
+  isWeekendDay,
+} from '@/features/calendar/composables/useDateUtils'
+import { buildExceptionLookup } from '@/features/calendar/composables/useExceptionLookup'
+import { useDragAndDrop } from '@/features/calendar/composables/useDragAndDrop'
 
 const props = defineProps<{
   calendar: Calendar
@@ -16,8 +28,11 @@ const ghostStyle = computed(() => props.ghostStyle ?? 'connected')
 const CELL_GAP_PX = 11
 const DAY_PADDING_PX = 0
 const hoveredEventId = ref<string | null>(null)
-const draggingEventId = ref<string | null>(null)
-const draggingSegmentId = ref<string | null>(null)
+
+const dragAndDrop = useDragAndDrop()
+const isDragging = dragAndDrop.isDragging
+const draggingSegmentId = dragAndDrop.draggingSegmentId
+const dragOverKey = dragAndDrop.dragOverKey
 
 const emit = defineEmits<{
   (event: 'select-day', dayId: string): void
@@ -38,19 +53,6 @@ const visibleMonth = ref(new Date(props.viewDate ?? new Date()))
 watch(() => props.viewDate, (d) => {
   if (d) visibleMonth.value = new Date(d)
 })
-const dragOverKey = ref<string | null>(null)
-const dragOverCounts = ref<Record<string, number>>({})
-const isDragging = ref(false)
-const suppressClicks = ref(false)
-
-const dayKey = (d: Date) => d.toISOString().slice(0, 10)
-
-function parseIsoDate(iso: string): Date {
-  const [year, month, day] = iso.split('-').map(Number)
-  const date = new Date(year ?? 0, (month ?? 1) - 1, day ?? 1)
-  date.setHours(0, 0, 0, 0)
-  return date
-}
 
 type DisplayItem = {
   segmentId: string
@@ -70,36 +72,6 @@ type DisplayItem = {
   connectRight?: boolean
   continuesAfter?: boolean
   globalOffset?: number
-}
-
-const isWeekendDay = (day: number) => day === 0 || day === 6
-
-type ExceptionLookup = {
-  global: Set<string>
-  perLayer: Record<string, Set<string>>
-}
-
-function buildExceptionLookup(calendar: Calendar): ExceptionLookup {
-  const lookup: ExceptionLookup = {
-    global: new Set<string>(),
-    perLayer: {},
-  }
-  for (const item of calendar.scheduledItems) {
-    const layer = calendar.layers.find((entry) => entry.key === item.layerKey)
-    if (!layer || layer.kind !== 'exception') continue
-    const iso = dayKey(new Date(item.date))
-    const targets =
-      item.targetLayerKeys && item.targetLayerKeys.length > 0 ? item.targetLayerKeys : null
-    if (!targets) {
-      lookup.global.add(iso)
-    } else {
-      targets.forEach((target) => {
-        if (!lookup.perLayer[target]) lookup.perLayer[target] = new Set<string>()
-        lookup.perLayer[target]!.add(iso)
-      })
-    }
-  }
-  return lookup
 }
 
 const layersByKey = computed(() => {
@@ -217,11 +189,6 @@ function splitIntoWeekSegments(
   return segments
 }
 
-function normalizeDate(date: Date): Date {
-  const d = new Date(date)
-  d.setHours(0, 0, 0, 0)
-  return d
-}
 
 type SegmentedItem = {
   base: ScheduledItem
@@ -357,26 +324,6 @@ function getLayerColor(layerKey: string): string {
   return layersByKey.value.get(layerKey)?.color ?? '#2563eb'
 }
 
-function startOfMonth(date: Date): Date {
-  const d = new Date(date)
-  d.setDate(1)
-  d.setHours(0, 0, 0, 0)
-  return d
-}
-
-function endOfMonth(date: Date): Date {
-  const d = new Date(date)
-  d.setMonth(d.getMonth() + 1, 0)
-  d.setHours(0, 0, 0, 0)
-  return d
-}
-
-function addDays(date: Date, n: number): Date {
-  const d = new Date(date)
-  d.setDate(d.getDate() + n)
-  return d
-}
-
 const weeks = computed(() => {
   const start = startOfMonth(visibleMonth.value)
   const end = endOfMonth(visibleMonth.value)
@@ -395,19 +342,6 @@ const weeks = computed(() => {
   return chunked
 })
 
-function nextMonth() {
-  const d = new Date(visibleMonth.value)
-  d.setMonth(d.getMonth() + 1)
-  visibleMonth.value = d
-  emit('update:viewDate', d)
-}
-
-function prevMonth() {
-  const d = new Date(visibleMonth.value)
-  d.setMonth(d.getMonth() - 1)
-  visibleMonth.value = d
-  emit('update:viewDate', d)
-}
 
 function isSameMonth(a: Date, b: Date): boolean {
   return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth()
@@ -419,111 +353,55 @@ const monthLabel = computed(() =>
   )
 )
 
-function daysBetween(aIso: string, b: Date): number {
-  // Compare in UTC days to avoid timezone off-by-one
-  const a = new Date(aIso)
-  const aUtc = Date.UTC(a.getUTCFullYear(), a.getUTCMonth(), a.getUTCDate())
-  const bUtc = Date.UTC(b.getUTCFullYear(), b.getUTCMonth(), b.getUTCDate())
-  return Math.round((bUtc - aUtc) / 86400000)
+function prevMonth() {
+  const d = new Date(visibleMonth.value)
+  d.setMonth(d.getMonth() - 1)
+  visibleMonth.value = d
+  emit('update:viewDate', d)
 }
 
-type DragPayload = {
-  scheduledItemId: string
-  date: string
-  layerKey?: string
-  segmentOffset?: number
+function nextMonth() {
+  const d = new Date(visibleMonth.value)
+  d.setMonth(d.getMonth() + 1)
+  visibleMonth.value = d
+  emit('update:viewDate', d)
 }
 
-function readDragPayload(ev: DragEvent): DragPayload | null {
-  const payload = ev.dataTransfer?.getData('application/json')
-  const fallback = !payload ? ev.dataTransfer?.getData('text/plain') : null
-  if (!payload && !fallback) return null
-  try {
-    return JSON.parse(payload || (fallback ?? '')) as DragPayload
-  } catch {
-    return null
-  }
-}
 
-function handleDragStart(
-  item: ScheduledItem,
-  segmentId: string,
-  segmentOffset: number,
-  ev: DragEvent
-) {
-  if (!ev.dataTransfer) return
-  isDragging.value = true
-  draggingEventId.value = item.id
-  draggingSegmentId.value = segmentId
-  const payload = JSON.stringify({
-    scheduledItemId: item.id,
-    date: item.date,
-    layerKey: item.layerKey,
-    segmentOffset,
-  })
-  // Set multiple types for cross-browser compatibility
-  ev.dataTransfer.setData('application/json', payload)
-  ev.dataTransfer.setData('text/plain', payload)
-  ev.dataTransfer.effectAllowed = 'move'
+function handleDragStart(item: ScheduledItem, segmentId: string, segmentOffset: number, ev: DragEvent) {
+  dragAndDrop.handleDragStart(item, segmentId, segmentOffset, ev)
 }
 
 function handleDragOver(ev: DragEvent) {
-  if (ev.dataTransfer) {
-    ev.dataTransfer.dropEffect = 'move'
-  }
-  ev.preventDefault()
+  dragAndDrop.handleDragOver(ev)
 }
 
 function handleDragEnter(date: Date, ev: DragEvent) {
-  const key = dayKey(date)
-  dragOverCounts.value[key] = (dragOverCounts.value[key] ?? 0) + 1
-  dragOverKey.value = key
-  handleDragOver(ev)
+  dragAndDrop.handleDragEnter(date, ev)
 }
 
 function handleDragLeave(date: Date) {
-  const key = dayKey(date)
-  const next = (dragOverCounts.value[key] ?? 1) - 1
-  dragOverCounts.value[key] = Math.max(0, next)
-  if (next <= 0 && dragOverKey.value === key) {
-    dragOverKey.value = null
-  }
+  dragAndDrop.handleDragLeave(date)
 }
 
 function resetDraggingState() {
-  isDragging.value = false
-  draggingEventId.value = null
-  draggingSegmentId.value = null
+  dragAndDrop.resetDraggingState()
 }
 
 function handleDrop(date: Date, ev: DragEvent) {
-  ev.preventDefault()
-  const data = readDragPayload(ev)
-  if (!data) return
   const includeWeekends = props.calendar.includeWeekends ?? true
-  if (data.layerKey && isDateBlocked(data.layerKey, date, includeWeekends)) {
-    dragOverCounts.value[dayKey(date)] = 0
-    dragOverKey.value = null
-    resetDraggingState()
-    return
-  }
-  const originIso = new Date(data.date).toISOString().slice(0, 10)
-  const delta = daysBetween(originIso, date)
-  if (delta !== 0) {
-    emit('shift-day', {
-      scheduledItemId: data.scheduledItemId,
-      shiftByDays: delta,
-      layerKeys: data.layerKey ? [data.layerKey] : undefined,
-    })
-  }
-  dragOverCounts.value[dayKey(date)] = 0
-  dragOverKey.value = null
-  resetDraggingState()
-  // Prevent synthetic click firing after drop
-  suppressClicks.value = true
-  setTimeout(() => {
-    suppressClicks.value = false
-  }, 300)
+  dragAndDrop.handleDrop(
+    date,
+    ev,
+    isDateBlocked,
+    includeWeekends,
+    (payload) => emit('shift-day', payload)
+  )
+}
+
+
+function handleCaptureClick(ev: MouseEvent) {
+  dragAndDrop.handleCaptureClick(ev)
 }
 
 function handleBadgeEnter(eventId: string) {
@@ -535,49 +413,17 @@ function handleBadgeLeave(eventId: string) {
     hoveredEventId.value = null
   }
 }
-
-function handleEventClick(item: ScheduledItem, ev: MouseEvent) {
-  if (isDragging.value || suppressClicks.value) {
-    ev.preventDefault()
-    ev.stopPropagation()
-    ;(ev as unknown as { stopImmediatePropagation?: () => void })
-      .stopImmediatePropagation?.()
-    return
-  }
-  emit('select-day', item.id)
-}
-
-function handleCaptureClick(ev: MouseEvent) {
-  if (isDragging.value || suppressClicks.value) {
-    ev.preventDefault()
-    ev.stopPropagation()
-    ;(ev as unknown as { stopImmediatePropagation?: () => void })
-      .stopImmediatePropagation?.()
-  }
-}
 </script>
 
 <template>
   <section class="flex flex-col gap-4" @click.capture="handleCaptureClick">
-    <header class="flex items-center justify-between gap-3">
-      <button
-        type="button"
-        class="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 text-slate-600 transition hover:bg-slate-100 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800/70"
-        @click="prevMonth"
-        aria-label="Previous month"
-      >
-        ‹
-      </button>
-      <h3 class="text-lg font-semibold text-slate-900 dark:text-white">{{ monthLabel }}</h3>
-      <button
-        type="button"
-        class="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 text-slate-600 transition hover:bg-slate-100 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800/70"
-        @click="nextMonth"
-        aria-label="Next month"
-      >
-        ›
-      </button>
-    </header>
+    <CalendarNavigation
+      :label="monthLabel"
+      :prev-label="'Previous month'"
+      :next-label="'Next month'"
+      :on-prev="prevMonth"
+      :on-next="nextMonth"
+    />
 
     <div class="grid grid-cols-7 gap-px rounded-2xl bg-slate-200/70 p-px dark:bg-slate-700/60">
       <div
@@ -589,98 +435,34 @@ function handleCaptureClick(ev: MouseEvent) {
       </div>
 
       <template v-for="(week, wi) in weeks" :key="wi">
-        <div
+        <CalendarDayCell
           v-for="date in week"
           :key="date.toISOString()"
-          class="group relative min-h-[110px] bg-white p-2 text-sm text-slate-700 dark:bg-slate-900 dark:text-slate-200"
-          :class="[
-            !isSameMonth(date, visibleMonth) ? 'bg-slate-50 text-slate-400 dark:bg-slate-800/40 dark:text-slate-500' : '',
-            dayKey(date) === todayIso ? 'ring-2 ring-blue-400/60 ring-offset-1 ring-offset-white dark:ring-offset-slate-900' : '',
-            dragOverKey === dayKey(date) ? 'border-2 border-dashed border-blue-400 bg-blue-50/40 dark:bg-blue-500/20' : 'border border-transparent'
-          ]"
-          :data-date="dayKey(date)"
-          @dragenter="handleDragEnter(date, $event)"
+          :date="date"
+          :display-items="displayItemsByDate[dayKey(date)] ?? []"
+          :selected-day-id="selectedDayId"
+          :hovered-event-id="hoveredEventId"
+          :dragging-segment-id="draggingSegmentId"
+          :is-dragging="isDragging"
+          :drag-over-key="dragOverKey"
+          :today-iso="todayIso"
+          :is-same-month="isSameMonth(date, visibleMonth)"
+          :visible-month="visibleMonth"
+          :ghost-style="ghostStyle"
+          :cell-gap-px="CELL_GAP_PX"
+          :cell-padding-px="DAY_PADDING_PX"
+          :get-layer-color="getLayerColor"
+          @select-day="(dayId) => emit('select-day', dayId)"
+          @add-event="(payload) => emit('add-event', payload)"
+          @dragstart="(payload) => handleDragStart(payload.item, payload.segmentId, payload.segmentOffset, payload.ev)"
+          @dragend="resetDraggingState"
+          @badge-enter="handleBadgeEnter"
+          @badge-leave="handleBadgeLeave"
+          @dragenter="(ev) => handleDragEnter(date, ev)"
           @dragover="handleDragOver"
-          @dragleave="handleDragLeave(date)"
-          @drop="handleDrop(date, $event)"
-        >
-          <div class="text-xs font-semibold text-slate-500 dark:text-slate-400">
-            {{ date.getDate() }}
-          </div>
-          <button
-            type="button"
-            class="absolute right-2 top-2 hidden rounded-full border border-slate-200 bg-white px-1 text-xs font-semibold text-slate-500 shadow-sm transition hover:bg-slate-100 group-hover:inline-flex dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200"
-            @click.stop="emit('add-event', { date: dayKey(date) })"
-            aria-label="Add event"
-          >
-            +
-          </button>
-
-          <ul class="mt-1 flex h-full flex-col gap-1">
-            <li
-              v-for="display in (displayItemsByDate[dayKey(date)] ?? [])"
-              :key="display.segmentId"
-              class="relative flex"
-            >
-              <template v-if="display.isGap && !display.isPlaceholder">
-                <MultiDayBadge
-                  data-testid="blocked-gap"
-                  :data-gap-for="display.base.id"
-                  :label="display.base.title"
-                  :color="getLayerColor(display.base.layerKey)"
-                  width="100%"
-                  :show-label="false"
-                  :is-ghost="true"
-                  :ghost-style="ghostStyle"
-                  :connects-left="display.connectLeft ?? false"
-                  :connects-right="display.connectRight ?? false"
-                  :cell-gap-px="CELL_GAP_PX"
-                  :cell-padding-px="DAY_PADDING_PX"
-                />
-              </template>
-              <template v-else-if="!display.isPlaceholder">
-                <MultiDayBadge
-                  :label="display.base.title"
-                  :color="getLayerColor(display.base.layerKey)"
-                  width="100%"
-                  :show-label="display.showLabel ?? false"
-                  :is-ghost="false"
-                  :ghost-style="ghostStyle"
-                  :connects-left="display.connectLeft ?? false"
-                  :connects-right="display.connectRight ?? false"
-                  :is-selected="selectedDayId === display.base.id"
-                  :is-continuation="display.isContinuation"
-                  :cell-gap-px="CELL_GAP_PX"
-                  :cell-padding-px="DAY_PADDING_PX"
-                  :highlighted="hoveredEventId === display.base.id"
-                  :description="display.base.description"
-                  :treat-as-head="isDragging && draggingSegmentId === display.segmentId"
-                  type="button"
-                  :title="display.isContinuation ? `${display.base.title} (continues)` : display.base.title"
-                  draggable="true"
-                  @click="handleEventClick(display.base, $event)"
-                  @dragstart="
-                    handleDragStart(
-                      display.base,
-                      display.segmentId,
-                      display.globalOffset ?? 0,
-                      $event
-                    )
-                  "
-                  @dragend="resetDraggingState()"
-                  @mouseenter="handleBadgeEnter(display.base.id)"
-                  @mouseleave="handleBadgeLeave(display.base.id)"
-                />
-              </template>
-              <template v-else>
-                <div
-                  class="h-[25.8px] w-full opacity-0 pointer-events-none"
-                  aria-hidden="true"
-                />
-              </template>
-            </li>
-          </ul>
-        </div>
+          @dragleave="() => handleDragLeave(date)"
+          @drop="(ev) => handleDrop(date, ev)"
+        />
       </template>
     </div>
   </section>

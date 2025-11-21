@@ -48,7 +48,7 @@ const monthLabel = computed(() =>
 </script>
 
 <template>
-  <section class="rounded-2xl border border-slate-200/80 bg-white/95 p-4 shadow-sm dark:border-slate-700/70 dark:bg-slate-900">
+  <Card padding="md">
     <header class="mb-2 flex items-center justify-between gap-2 text-sm font-semibold text-slate-700 dark:text-slate-100">
       <button
         type="button"
@@ -101,7 +101,7 @@ const monthLabel = computed(() =>
         </button>
       </template>
     </div>
-  </section>
+  </Card>
 </template>
 
 
