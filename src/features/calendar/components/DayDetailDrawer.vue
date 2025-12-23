@@ -6,6 +6,10 @@ import type {
   ScheduledItem,
   ShiftScheduledItemsRequest,
 } from '@/features/calendar/types/calendar'
+import Card from './ui/Card.vue'
+import Button from './ui/Button.vue'
+import FormInput from './ui/FormInput.vue'
+import { dayKey, parseIsoDate, daysBetween } from '@/features/calendar/composables/useDateUtils'
 
 const props = defineProps<{
   open: boolean
@@ -26,6 +30,8 @@ const state = reactive({
   shiftByDays: 1,
   layerSelections: [] as string[],
   splitParts: 2,
+  targetDate: '', // ISO date string (YYYY-MM-DD) for date picker
+  isSyncingDate: false, // Flag to prevent shift when syncing from props
 })
 
 const layerOptions = computed(() => props.calendar?.layers ?? [])
@@ -36,13 +42,20 @@ watch(
     if (!day) {
       state.layerSelections = []
       state.splitParts = 2
+      state.targetDate = ''
       return
     }
-    const defaults = new Set(props.linkedLayerKeys)
-    defaults.add(day.layerKey)
-    state.layerSelections = Array.from(defaults)
+    // Only shift within the same layer
+    state.layerSelections = [day.layerKey]
     state.shiftByDays = 1
     state.splitParts = 2
+    // Sync date picker without triggering shift
+    state.isSyncingDate = true
+    state.targetDate = dayKey(day.date)
+    // Reset flag after a tick to allow user changes
+    setTimeout(() => {
+      state.isSyncingDate = false
+    }, 0)
   },
   { immediate: true }
 )
@@ -54,14 +67,29 @@ function formatDateDisplay(iso: string | undefined): string {
   return formatDate(iso, { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })
 }
 
-function handleShift(sign: number) {
-  if (!props.day) return
-  emit('shift', {
-    scheduledItemId: props.day.id,
-    shiftByDays: sign,
-    layerKeys: state.layerSelections,
-  })
+function handleDateChange(newDate: string) {
+  // Don't update shiftByDays when syncing from props
+  if (state.isSyncingDate || !props.day || !newDate) return
+  
+  const targetDate = parseIsoDate(newDate)
+  
+  // Calculate the difference in days
+  const diff = daysBetween(props.day.date, targetDate)
+  
+  // Update shiftByDays to reflect the change (but don't apply yet - user must click "Apply shift")
+  state.shiftByDays = diff
 }
+
+// Calculate preview shift when targetDate changes
+const calculatedShift = computed(() => {
+  if (!props.day || !state.targetDate) return 0
+  const currentDateIso = dayKey(props.day.date)
+  // If the target date matches current date, no shift
+  if (state.targetDate === currentDateIso) return 0
+  const targetDate = parseIsoDate(state.targetDate)
+  return daysBetween(props.day.date, targetDate)
+})
+
 
 function handleSubmit() {
   if (!props.day || state.shiftByDays === 0 || props.busy) return
@@ -153,63 +181,40 @@ function handleUnsplit() {
 
         <Card padding="md" class="space-y-5">
           <header class="space-y-1">
-            <h3 class="text-base font-semibold text-slate-900 dark:text-white">Reschedule items</h3>
+            <h3 class="text-base font-semibold text-slate-900 dark:text-white">Reschedule item</h3>
             <p class="text-sm text-slate-500 dark:text-slate-400">
-              Select the layers that should adjust with this change.
+              Move this item to a different date. Other items in this layer will automatically shift to maintain the sequence.
+            </p>
+            <p v-if="calendar?.includeExceptions" class="text-xs text-slate-500 dark:text-slate-400">
+              Exception dates will be skipped when calculating the new position.
             </p>
           </header>
 
-          <div class="flex flex-col gap-2 sm:flex-row">
-            <Button
-              variant="secondary"
-              size="sm"
-              class="flex-1 rounded-full border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100 dark:border-blue-400/60 dark:bg-blue-500/10 dark:text-blue-100"
-              :disabled="busy"
-              @click="handleShift(-1)"
-            >
-              Move up 1 day
-            </Button>
-            <Button
-              variant="secondary"
-              size="sm"
-              class="flex-1 rounded-full border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100 dark:border-blue-400/60 dark:bg-blue-500/10 dark:text-blue-100"
-              :disabled="busy"
-              @click="handleShift(1)"
-            >
-              Delay 1 day
-            </Button>
-          </div>
-
           <form class="flex flex-col gap-4" @submit.prevent="handleSubmit">
+            <FormInput
+              v-model="state.targetDate"
+              type="date"
+              label="Move to date"
+              :disabled="busy"
+              @update:modelValue="handleDateChange"
+            />
+            <p v-if="calculatedShift !== 0 && state.targetDate" class="text-xs text-slate-500 dark:text-slate-400">
+              <span v-if="calculatedShift > 0">Will move forward by {{ calculatedShift }} day{{ calculatedShift === 1 ? '' : 's' }}</span>
+              <span v-else>Will move back by {{ Math.abs(calculatedShift) }} day{{ Math.abs(calculatedShift) === 1 ? '' : 's' }}</span>
+            </p>
+            
             <FormInput
               v-model.number="state.shiftByDays"
               type="number"
-              label="Shift by (days)"
+              label="Or shift by (days)"
               :min="-30"
               :max="30"
               :disabled="busy"
             />
-
-            <fieldset class="space-y-3 rounded-xl border border-slate-200/80 p-3 dark:border-slate-700/70">
-              <legend class="px-1 text-xs font-semibold uppercase tracking-[0.3em] text-slate-400">Layer adjustments</legend>
-              <ul class="space-y-2 text-sm text-slate-600 dark:text-slate-300">
-                <li
-                  v-for="layer in layerOptions"
-                  :key="layer.key"
-                >
-                  <label class="inline-flex items-center gap-3">
-                    <input
-                      type="checkbox"
-                      :value="layer.key"
-                      v-model="state.layerSelections"
-                      :disabled="busy"
-                      class="h-4 w-4 rounded border-slate-300 text-brand focus:ring-brand dark:border-slate-600"
-                    />
-                    <span>{{ layer.name }}</span>
-                  </label>
-                </li>
-              </ul>
-            </fieldset>
+            <p v-if="state.shiftByDays !== 0" class="text-xs text-slate-500 dark:text-slate-400">
+              <span v-if="state.shiftByDays > 0">Will move forward by {{ state.shiftByDays }} day{{ state.shiftByDays === 1 ? '' : 's' }}</span>
+              <span v-else>Will move back by {{ Math.abs(state.shiftByDays) }} day{{ Math.abs(state.shiftByDays) === 1 ? '' : 's' }}</span>
+            </p>
 
             <Button
               type="submit"

@@ -87,7 +87,7 @@ const baseCalendar: Calendar = {
 }
 
 describe('useScheduleAdjuster', () => {
-  it('shifts all linked layers by default, skipping weekends and exceptions', () => {
+  it('shifts items within the same layer only, skipping weekends and exceptions', () => {
     const adjuster = useScheduleAdjuster()
     const shifted = adjuster.shiftScheduledItemsLocally(baseCalendar, {
       scheduledItemId: 'reference-2',
@@ -108,14 +108,17 @@ describe('useScheduleAdjuster', () => {
     expect(progressItem).toBeDefined()
     expect(exceptionItem).toBeDefined()
 
+    // Reference item should shift
     expect(new Date(referenceItem!.date).toISOString()).toBe(
       new Date('2025-08-07T00:00:00.000Z').toISOString()
     )
 
+    // Progress item should NOT shift (different layer)
     expect(new Date(progressItem!.date).toISOString()).toBe(
-      new Date('2025-08-08T00:00:00.000Z').toISOString()
+      new Date('2025-08-05T00:00:00.000Z').toISOString()
     )
 
+    // Exception item should NOT shift (exception layers don't chain)
     expect(new Date(exceptionItem!.date).toISOString()).toBe(
       new Date('2025-08-05T00:00:00.000Z').toISOString()
     )
@@ -144,7 +147,7 @@ describe('useScheduleAdjuster', () => {
     )
   })
 
-  it('always updates the target item even when sequences tie across layers', () => {
+  it('only shifts items within the same layer, even when sequences tie across layers', () => {
     const adjuster = useScheduleAdjuster()
     const calendar = JSON.parse(JSON.stringify(baseCalendar)) as Calendar
 
@@ -175,11 +178,13 @@ describe('useScheduleAdjuster', () => {
 
     expect(updatedReference).toBeDefined()
     expect(updatedProgress).toBeDefined()
+    // Reference item should shift
     expect(new Date(updatedReference!.date).toISOString()).toBe(
       new Date('2025-08-06T00:00:00.000Z').toISOString()
     )
+    // Progress item should NOT shift (different layer)
     expect(new Date(updatedProgress!.date).toISOString()).toBe(
-      new Date('2025-08-07T00:00:00.000Z').toISOString()
+      new Date('2025-08-05T00:00:00.000Z').toISOString()
     )
   })
 

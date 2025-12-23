@@ -76,7 +76,7 @@ Foundational infrastructure remains strong and the latest merge delivered the lo
 - ✅ **Unit tests** (`useScheduleAdjuster.spec.ts`) cover weekend/holiday skipping to guard regressions.
 
 **What's missing:**
-- ❌ **Date picker/direct date entry** — still limited to drag/drop or +/- buttons.
+- ❌ **Date picker/direct date entry** — still limited to drag/drop or +/- buttons. *High priority for UX*
 - ❌ **Collision detection + warnings** if a manual edit overlaps an existing day.
 
 **Code locations:**
@@ -148,7 +148,7 @@ Foundational infrastructure remains strong and the latest merge delivered the lo
 - ❌ Distinction between general exceptions and other off-day reasons
 
 ### 8. Timeline/Dashboard with reference delta and projections
-**Status: ~30% complete**
+**Status: ~30% complete** ~~(CANCELLED - Direction change: As a general calendar, reference layer comparison doesn't align with the generic use case)~~
 
 **What works:**
 - ✅ Basic timeline with start date, projected end date, total lessons
@@ -156,7 +156,7 @@ Foundational infrastructure remains strong and the latest merge delivered the lo
 - ✅ Upcoming items list
 
 **What's missing:**
-- ❌ **Reference comparison** - No delta calculation ("You are on Item 11; Reference is at Item 52 (-41)")
+- ~~❌ **Reference comparison** - No delta calculation ("You are on Item 11; Reference is at Item 52 (-41)")~~ *Cancelled - not applicable to generic calendar*
 - ❌ **Current day detection** - No automatic "today" vs schedule comparison
 - ❌ **Forecast display** - No catch-up scenario projections
 - ❌ **Milestones** - No milestone tracking
@@ -212,14 +212,14 @@ Foundational infrastructure remains strong and the latest merge delivered the lo
 
 **Impact:** Medium — day-to-day workflows are unblocked, but onboarding still feels incomplete.
 
-### 2. No Reference Layer Tracking
+### 2. ~~No Reference Layer Tracking~~ (CANCELLED)
 
 **Current State:**
-- Reference layer data is stored like any other progress layer.
-- Dashboard lacks delta calculations, "today vs reference layer" messaging, and milestones.
-- No composable/service to compare the current date to the reference layer's pacing.
+- ~~Reference layer data is stored like any other progress layer.~~
+- ~~Dashboard lacks delta calculations, "today vs reference layer" messaging, and milestones.~~
+- ~~No composable/service to compare the current date to the reference layer's pacing.~~
 
-**Impact:** High — differentiating reference vs progress layers is central to the product promise and is part of the MVP milestone.
+**Impact:** ~~High — differentiating reference vs progress layers is central to the product promise and is part of the MVP milestone.~~ **CANCELLED** - As we generalize the app for any calendar use case, reference layer comparison becomes less relevant. The app now focuses on generic chainable calendars rather than homeschool-specific pacing comparisons.
 
 ### 3. Missing API Endpoints
 
@@ -253,16 +253,18 @@ Foundational infrastructure remains strong and the latest merge delivered the lo
 
 **Files:** `SetupWizard.vue`, `CalendarDashboard.vue` (new subcomponent), `src/server/routes/calendars.ts`, `calendarService.ts`, `calendarModel.ts`, `dateUtils.ts`.
 
-### Priority 2: Reference Layer Tracking & Timeline (High)
+### ~~Priority 2: Reference Layer Tracking & Timeline (High)~~ (CANCELLED)
 
-1. **Comparison logic**
+~~1. **Comparison logic**
    - Add a composable/service (`useReferenceLayerComparison` or Pinia module) that maps "today" to current reference + progress layer indexes.
    - Persist metadata (e.g., `referenceCalendarId`) if needed for clarity.
 2. **Timeline/Dashboard UI**
    - Surface "You are on Item X / Reference Item Y (ΔZ)" with status chips.
    - Highlight projected end date and parity date (placeholder calculations until catch-up planner ships).
 
-**Files:** `CalendarTimeline.vue`, `CalendarDashboard.vue`, new composable in `src/features/calendar/composables/`.
+**Files:** `CalendarTimeline.vue`, `CalendarDashboard.vue`, new composable in `src/features/calendar/composables/`.~~
+
+**CANCELLED** - Direction change: As we generalize the app for any calendar use case, reference layer comparison becomes less relevant. Focus shifted to generic chainable calendar features.
 
 ### Priority 3: Setup Wizard Quality + Regeneration (High)
 

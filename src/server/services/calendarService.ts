@@ -1003,12 +1003,11 @@ export async function shiftScheduledItems(
     return null
   }
 
+  // Default to only the target item's layer (single-layer chaining)
   const layerKeys =
     payload.layerKeys && payload.layerKeys.length > 0
       ? payload.layerKeys
-      : calendar.layers
-          .filter((layer: CalendarLayerSubdocument) => layer.autoShift)
-          .map((layer: CalendarLayerSubdocument) => layer.key)
+      : [targetItem.layerKey]
 
   const layerByKey = new Map(
     calendar.layers.map((layer: CalendarLayerSubdocument) => [layer.key, layer])

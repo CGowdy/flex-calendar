@@ -129,17 +129,20 @@ function nextSchoolDate(
 
 function toEffectiveLayerKeys(
   calendar: Calendar,
-  explicitKeys?: string[]
+  explicitKeys?: string[],
+  targetLayerKey?: string
 ): Set<string> {
   if (explicitKeys && explicitKeys.length > 0) {
     return new Set(explicitKeys)
   }
 
-  return new Set(
-    calendar.layers
-      .filter((layer) => layer.chainBehavior === 'linked')
-      .map((layer) => layer.key)
-  )
+  // Default to only the target item's layer (single-layer chaining)
+  if (targetLayerKey) {
+    return new Set([targetLayerKey])
+  }
+
+  // Fallback: if no target layer specified, return empty set (shouldn't happen in practice)
+  return new Set()
 }
 
 export function useScheduleAdjuster() {
@@ -163,7 +166,8 @@ export function useScheduleAdjuster() {
 
     const effectiveLayerKeys = toEffectiveLayerKeys(
       workingCopy,
-      payload.layerKeys
+      payload.layerKeys,
+      targetItem.layerKey
     )
 
     const exceptionDates = getExceptionDates(workingCopy)

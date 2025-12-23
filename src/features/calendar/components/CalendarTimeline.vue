@@ -192,7 +192,23 @@ function formatDate(date: Date | null): string {
               class="h-3.5 w-3.5 rounded border border-slate-200 dark:border-slate-600"
               :style="{ backgroundColor: layer.color || '#64748b' }"
             />
-            <span class="font-medium text-slate-700 dark:text-slate-200">{{ layer.name }}</span>
+            <div class="flex flex-1 items-center gap-2">
+              <span class="font-medium text-slate-700 dark:text-slate-200">{{ layer.name }}</span>
+              <span
+                v-if="layer.chainBehavior === 'linked'"
+                class="rounded-full bg-blue-100 px-2 py-0.5 text-[0.65rem] font-semibold uppercase tracking-wider text-blue-700 dark:bg-blue-500/20 dark:text-blue-300"
+                title="Linked: Moving an item in this layer will shift other items in the same layer to maintain the sequence"
+              >
+                Linked
+              </span>
+              <span
+                v-else-if="layer.kind === 'exception'"
+                class="rounded-full bg-orange-100 px-2 py-0.5 text-[0.65rem] font-semibold uppercase tracking-wider text-orange-700 dark:bg-orange-500/20 dark:text-orange-300"
+                title="Exception: Dates in this layer block scheduling in other layers"
+              >
+                Exception
+              </span>
+            </div>
             <input
               class="h-5 w-10 cursor-pointer rounded border border-slate-200 bg-transparent p-0 dark:border-slate-600"
               type="color"

@@ -1,227 +1,264 @@
-Project automation and environment rules for Cursor
+# .cursorrules — Flex Calendar (Cursor) Unified Workflow Rules
+# Purpose: emulate your “modes” (Spec → Build → Red Team → Tests → PR) using Cursor’s built-in Ask/Plan/Agent/Debug.
 
-Docker and hot reload
-- For changes in src/**, rely on Vite HMR. Do not rebuild containers.
-- If the web UI does not reflect edits (common on Windows bind mounts), do:
-  1) docker-compose restart web
-  2) If still stale or after config changes, docker-compose up -d --build web
-- Rebuild web on edits to:
-  - package.json, package-lock.json, bun.lockb
-  - vite.config.ts, tailwind.config.ts, postcss.config.cjs
-  - tsconfig*.json
-  - docker-compose.yml
-  - .env, env.example
+################################################################################
+## 0) How to use Cursor with these rules (IMPORTANT)
+################################################################################
 
-Standard commands
-- Start stack: docker-compose up -d --build
-- Rebuild only web: docker-compose up -d --build web
-- Restart only web: docker-compose restart web
-- View logs: docker-compose logs -f web
+Cursor has fixed engines: **Ask / Plan / Agent / Debug**.
+This file defines the “role behaviors” so you can get predictable output.
 
-Agent workflow
-- After making config/dependency changes affecting the web dev server, immediately run “docker-compose up -d --build web”.
-- After typical code edits under src/**, do not rebuild; just refresh the browser. If the change is not detected within ~2 seconds, run “docker-compose restart web”.
+### Recommended mapping (your old modes → Cursor engines)
+- **Navigator / “What next?”** → Ask
+- **Story Spec Squeezer** → Plan
+- **Full-Stack Beast Dev** → Agent
+- **Red Team Reviewer** → Debug
+- **Unit Test Author** → Agent (when invoked)
+- **PR Writer + Final Gate** → Ask
 
+### Role header convention (strongly recommended)
+Start your message with one of these headers so the assistant locks in the role:
 
-# AI Agent Repository Rules (Vue-First Edition)
+- `ROLE: SPEC`        (Plan)
+- `ROLE: BUILD`       (Agent)
+- `ROLE: REDTEAM`     (Debug)
+- `ROLE: TESTS`       (Agent)
+- `ROLE: PR`          (Ask)
+- `ROLE: NAVIGATOR`   (Ask; side projects)
 
-## 0) Solo-Maintainability Defaults (you are the only dev)
-- Prefer boring, conventional solutions over clever abstractions.
-- Optimize for *future you*: fewer files, fewer layers, fewer concepts to recall.
-- Avoid hidden magic and deep indirection; make data flow explicit.
-- If two patterns are similar in quality, **choose the simpler one**.
-- Keep dependencies lean; prefer first-party or standard libs over niche packages.
-- Co-locate code and tests with their feature. Avoid cross-feature coupling.
-- Leave a 3–5 line **ADR-lite** note with major changes: *Context → Decision → Consequences* (top of the PR or file header).
-- Name things literally; favor `UsersTable.vue` over `SmartList.vue`.
-- Add `// WHY:` comments sparingly where intent is non-obvious.
-- Create/maintain a `DOCS/HowTo.md` with copy-pasta snippets for recurring tasks (new component, new route, new store).
+If ROLE is provided, follow that role’s rules and **do not mix roles** in the same response.
 
-## 1) UI Verification Policy (95% confidence)
-- For any change that impacts UI/UX (HTML/CSS/JS/Vue templates, styles, assets, routing):
-  - Open the affected page(s) in the browser.
-  - Visually verify layout, spacing, overflow, responsiveness, and interactions.
-  - If print output is relevant, check @media print rendering.
-  - Re-check after each non-trivial edit until there is 95% confidence the result matches requirements.
-  - Prefer realistic data and edge cases (long text, missing images, small screens) during verification.
+### Context discipline (most important)
+- For review/PR: include `@changes` or select the changed files.
+- For implementation: select the feature folder + API folder(s) involved.
+- For “what next”: include `product-spec.md`, `implementation-status.md`, `workflow.md`, `HowTo.md` if they exist.
 
-## 2) Clarification Policy (95% confidence)
-- Before implementing, ask targeted questions until 95% confident about scope, constraints, and success criteria.
-- If unknowns remain (e.g., dimensions, DPI targets, asset paths, accessibility, browser support), surface them proactively and propose sensible defaults.
+################################################################################
+## 1) Project Direction (Flex Calendar domain vocabulary)
+################################################################################
 
-## 3) Evidence & Feedback Loop
-- When feasible, include brief browser verification notes (what was checked) and call out remaining risks.
-- Default to high-signal, minimal commentary; focus on outcome and any unresolved edge cases.
+You are helping evolve “Flex Calendar” from homeschool-specific → generic flexible calendar.
 
-## 4) Safety & Non-regression
-- Avoid breaking unrelated pages/components. If risk exists, mention it and add quick checks.
-- Respect repository linting/formatting rules; resolve new lints before finishing.
+Keep existing behavior + architecture:
+- Reflowing days, skipping weekends/holidays, chain-aware moves.
+- Month/week/day views, drag-and-drop, chain moves.
 
-## 5) Prioritization
-- Prioritize user-visible correctness over micro-optimizations.
-- Prefer incremental changes with frequent verification, especially for UI.
-
----
-
-## 6) Testing Policy (Quality Bar)
-
-Every feature, bug fix, or refactor must include or update tests.  
-Prefer fast, meaningful tests over brittle or overly mocked tests.
-
-### 6.1 Unit/Component Tests (default)
-- Use **Vitest** with **Vue Testing Library**.
-- Follow Testing Library principles: test via user-observable behavior (roles, labels, text), not implementation details.
-- Prefer queries like `getByRole`, `getByLabelText`, and `getByText`; avoid `getByTestId` unless necessary.
-- Use `user-event` style interactions; assert on visible outcomes and ARIA state.
-- Co-locate component tests next to the component or in `tests/unit` with matching filename patterns.
-- Mock network with **MSW** where appropriate; avoid deep mocking of framework internals.
-
-### 6.2 End-to-End Tests (front-end flows)
-- Use **Playwright** for E2E. Target key user journeys and smoke paths.
-- Run headless in CI with a small cross-browser matrix (Chromium minimum; add WebKit/Firefox when feasible).
-- Prefer stable selectors (roles/labels) over brittle CSS/XPath.
-- Include accessibility checks where practical (landmarks/roles/contrast assertions or axe where available).
-
-### 6.3 Print and Rendering Checks
-- For features that affect print, add Playwright screenshot assertions for `@media print` layouts or PDF snapshot diff where feasible.
-
-### 6.4 Coverage & Gates
-- Aim for ≥80% global coverage and meaningful coverage on changed files; do not chase coverage at the expense of test quality.
-- CI must run: type-check, lint, unit/component tests, and E2E smoke; fail the build on red.
-
-### 6.5 Test Organization & Naming
-- `tests/unit` and `tests/e2e` directories (or co-located `__tests__`) with clear, action-oriented names.
-- Keep tests deterministic; avoid time/date randomness without fixed seeds.
-
-### 6.6 Test Watch Commands (Non-Interactive)
-- All test watch commands run in non-interactive mode (no prompts):
-  - `bun run test:unit:watch` - Vitest watch for unit/component tests
-  - `bun run test:server:watch` - Vitest watch for server tests
-  - `bun run test:e2e:watch` - Playwright watch for E2E tests
-  - `bun run test:ct:watch` - Playwright watch for component tests
-- These commands are safe to run in background and will auto-rerun on file changes.
-- For one-off runs without watch: `bun run test:unit`, `bun run test:server`, `bun run test:e2e`, `bun run test:ct`
-
----
-
-## 7) Vue 3 Development & Architecture Rules
-
-### General Principles
-- Default to **TypeScript** everywhere.
-- Prefer composable, readable solutions over large, monolithic components.
-- Keep components small and focused.
-- Extract shared logic into composables, services, or stores where it improves clarity.
-- Follow the project’s naming, file, and folder conventions before introducing new ones.
-- Be honest about tradeoffs and suggest cleaner alternatives if a pattern feels off.
-
-### Vue Patterns
-- Use **Vue 3** with `<script setup>` and the **Composition API**.
-- Define props/emits with `defineProps` / `defineEmits` and strong types.
-- Organize features like:
-src/
-features/
-<feature>/
-components/
-composables/
-stores/
-services/
-
-markdown
-Copy code
-- Keep templates presentational; move logic into script or composables.
-- Prefer slots and composition patterns over prop overloads.
-- Use **Pinia** (or equivalent) for global state.
-- Keep API interaction centralized in services or **TanStack Query** hooks, not scattered fetch calls.
-- Co-locate types/interfaces near usage or in `src/types`.
-
-### TypeScript
-- Use strict mode.
-- Type public APIs, props, emits, and return values clearly.
-- Use discriminated unions or generics instead of `any`.
-- Let inference work inside implementation for cleaner code.
-
-### Performance & DX
-- Readability > micro-optimization unless performance is a proven bottleneck.
-- Favor incremental refactors over full rewrites.
-- When generating code, ensure it matches lint/prettier setup automatically.
-- Prefer *framework-native* solutions before adding libraries.
-
----
-
-## 8) AI Collaboration Behavior
-
-### When the AI Writes Code
-1. Summarize the plan in 3–5 bullets first.  
-2. Implement code that fits the repo’s structure and naming.  
-3. Keep diffs tight; do not rewrite unrelated files.  
-4. After implementation, summarize what changed and why.  
-5. Suggest (but don’t auto-commit) optional refactors or tests.  
-6. If multiple approaches are viable, **pick the one that’s easiest to maintain solo** and note the tradeoff in one line.
-
-### When the AI Explains Code
-- Give concise, senior-level explanations focusing on architecture, tradeoffs, and reasoning.
-- Skip syntax tutorials; explain *why*, not *how*.
-- When relevant, note potential improvements or cleaner idioms.
-
----
-
-## ✅ TL;DR Summary for Cursor Agent
-- This is a **Vue 3 + TypeScript** repository maintained by a **solo developer**.
-- Prefer conventional, minimal, and explicit patterns that are easy to revisit.
-- Apply 95% verification & clarification policies before major changes.
-- Follow Testing Library + Playwright testing principles.
-- Default to Composition API, Pinia for state, and feature-based structure.
-- Keep dependencies lean, code TypeScript-strict, and changes well-scoped.
-- Communicate briefly; choose the simplest maintainable solution when in doubt.
-
-## 9) Docker & Dev Server Rules
-
-- Dev default: Run DB in Docker only; run API and Web natively with hot reload.
-  - Compose file: `infra/docker-compose.dev.yml`
-  - Start DB: `docker compose -f infra/docker-compose.dev.yml up -d`
-  - After edits under `src/**`, do not rebuild containers; rely on Vite and Bun hot reload.
-  - If the web UI doesn’t reflect edits within ~2s, refresh the browser first. Mongo Express can be restarted with: `docker compose -f infra/docker-compose.dev.yml restart mongo-express`.
-
-- NAS/full mode: Use `infra/docker-compose.full.yml` with Caddy reverse proxy.
-  - Web is built to static and served by nginx; API is exposed behind `/api` via Caddy.
-  - Keep environment in `.env` and `.env.mongo`. Do not hardcode secrets in Dockerfiles.
-
-- Rebuild policy:
-  - Only rebuild containers in full mode when editing config/dependencies.
-  - Rebuild a single service: `docker compose -f infra/docker-compose.full.yml up -d --build web` (or `api`).
-
-
-
-## Cursor IProject Direction
-
-You are helping me evolve a repo called "Flex Calendar".
-
-Context:
-- This app is currently designed around a homeschool use case (Abeka curriculum + student calendars + holidays).
-- Under the hood, it already has:
-  - Calendar creation with generated "days" (e.g. Day 1..N).
-  - Groupings (Abeka, student A/B, holidays) with flags like autoShift / isChained.
-  - A scheduling engine that can reflow days when they’re moved, and skip weekends and holidays.
-  - Month / week / day calendar views with drag-and-drop and chain-aware moves.
-  - Markdown docs: implementation-status.md, product-spec.md, workflow.md, HowTo.md that describe the current behavior and roadmap.
-
-Goal:
-- Generalize the app into a **generic flexible calendar**:
-  - No hard-coded “Abeka”, “student A/B”, or homeschool-only naming in the core domain.
-  - Homeschool/Abeka becomes a **use-case / preset**, not the core mental model.
-  - The core concepts should be usable for any domain where people want chainable events in a calendar:
-    - lesson plans, content pipelines, fitness programs, etc.
-
-High-level direction:
-- Keep the **existing behavior and architecture** (reflowing days, skipping weekends/holidays, chain moves).
-- Refactor names and docs so the domain is generic.
+Refactor names and docs toward generic domain:
 
 Use this vocabulary going forward:
+- **Calendar**: top-level container
+- **Layer** (was “grouping”): logical track within a calendar
+- **Template item**: ordered step not tied to a date (generic “Day N”)
+- **Scheduled item**: dated item on a layer (event/entry)
+- **Chain**: group of scheduled items that move together
+- **Chain behavior**: chain reflow rules (shift followers, respect exceptions)
+- **Exception**: excluded/special date (holidays, sick days, blackout)
 
-- **Calendar**: Top-level container, like in Google Calendar or iCal.
-- **Layer** (was "grouping"): A logical track within a calendar (e.g. “Math plan”, “Actual progress for Kid A”, “Holidays”). Different layers can be displayed together on the calendar.
-- **Template item**: A step in an ordered sequence that is not yet tied to a specific date. This is the generic version of “Abeka Day N”.
-- **Scheduled item**: A concrete item on a specific date in a specific layer (what most calendar apps call an “event” or “entry”). This is what gets moved around by the user.
-- **Chain**: A group of scheduled items that should move together according to chain rules.
-- **Chain behavior**: Rules for how a chain reflows (shift following items, respect weekends/holidays, etc.).
-- **Exception**: A date that should be excluded or treated specially (holidays, sick days, blackout dates). Often implemented as a Holidays layer, but the engine should treat them generically as exceptions.
+Goal: Homeschool/Abeka becomes a **preset/use-case**, not core domain.
+
+################################################################################
+## 2) Solo-maintainability defaults
+################################################################################
+
+- Prefer boring, conventional solutions over clever abstractions.
+- Optimize for future-you: fewer files/layers/concepts.
+- Avoid hidden magic and deep indirection; make data flow explicit.
+- If two patterns are similar, choose the simpler one.
+- Keep dependencies lean.
+- Co-locate feature code + tests; avoid cross-feature coupling.
+- Use literal names (`UsersTable.vue` > `SmartList.vue`).
+- Add `// WHY:` comments only where intent is non-obvious.
+- Keep a lightweight ADR note for major changes: Context → Decision → Consequences
+  (in PR description or top of relevant doc/file).
+
+################################################################################
+## 3) Development environment & Docker / hot reload rules
+################################################################################
+
+### Default dev mode
+- DB in Docker only; API + Web run natively with hot reload.
+- Compose file: `infra/docker-compose.dev.yml`
+- Start DB: `docker compose -f infra/docker-compose.dev.yml up -d`
+- After edits under `src/**`: do NOT rebuild containers. Rely on HMR.
+- If UI doesn’t reflect edits within ~2s:
+  1) refresh browser
+  2) if still stale: restart mongo-express if needed:
+     `docker compose -f infra/docker-compose.dev.yml restart mongo-express`
+
+### Full / NAS mode
+- Compose file: `infra/docker-compose.full.yml` (Caddy reverse proxy)
+- Web built static served by nginx; API behind `/api` via Caddy.
+- Keep env in `.env` and `.env.mongo`. Do NOT hardcode secrets.
+
+### Rebuild policy
+- Only rebuild containers for dependency/config edits.
+- Rebuild a single service (full mode):
+  - `docker compose -f infra/docker-compose.full.yml up -d --build web`
+  - `docker compose -f infra/docker-compose.full.yml up -d --build api`
+
+################################################################################
+## 4) Vue 3 + TypeScript architecture rules
+################################################################################
+
+- Vue 3 + `<script setup lang="ts">` + Composition API.
+- TypeScript everywhere; strict mode.
+- Keep components small and focused.
+- Extract shared logic into composables/services/stores only when it improves clarity.
+- Follow existing folder conventions before introducing new ones.
+- Readability > micro-optimization unless performance is proven bottleneck.
+- Prefer incremental refactors over rewrites.
+
+Suggested feature organization:
+src/
+  features/<feature>/
+    components/
+    composables/
+    stores/
+    services/
+
+Testing:
+- Front-end: Vitest + Vue Testing Library (behavior-driven)
+- Prefer `getByRole`, `getByLabelText`, `getByText`
+- Avoid implementation-detail assertions
+- Prefer user interactions and visible outcomes
+- Use MSW for network where appropriate
+
+E2E:
+- Playwright for key journeys / smoke paths
+- Prefer role/label selectors over brittle CSS/XPath
+
+Coverage:
+- Aim for meaningful coverage on changed files; don’t chase numbers at expense of test quality.
+
+################################################################################
+## 5) CRITICAL API interaction rules (if your repo uses TanStack Query)
+################################################################################
+
+If this repo uses TanStack Query patterns:
+- ALL API calls must use TanStack Query hooks / centralized API layer.
+- Do not scatter direct fetch/client calls in components.
+- Keep API interaction centralized (services or query hooks), not in templates/components.
+
+(If TanStack Query is not used in this repo, follow the repo’s actual API conventions.)
+
+################################################################################
+## 6) Role behaviors (emulating your old chatmodes)
+################################################################################
+
+### ROLE: NAVIGATOR (Ask)
+Use when the developer says they don’t know what to work on next.
+- Do NOT implement code.
+- Recommend ONE primary next task + 1 fallback + 1 stretch.
+- Prefer tasks that unblock, reduce uncertainty, and can show progress in ≤ 90 minutes.
+Output format:
+- Current State (2 bullets)
+- Primary Recommendation (1 concrete task + why)
+- Fallback (lower energy)
+- Stretch (only if flow is high)
+- Why not other tasks (brief)
+
+### ROLE: SPEC (Plan) — “Story Spec Squeezer”
+Goal: produce an implementable spec without guessing.
+- Minimal scope by default.
+- Provide: Summary, In/Out scope, Acceptance Criteria (binary), Assumptions, Open Questions (non-blocking defaults), Test Ideas, Likely Impacted Areas.
+- Stop once AC is testable; do not propose implementation.
+
+### ROLE: BUILD (Agent) — “Beast Dev”
+Goal: implement the story end-to-end without scope creep.
+Workflow:
+1) Restate scope (in/out)
+2) Create a markdown TODO list
+3) Execute sequentially with tight diffs
+4) Add/update tests for changed behavior
+5) Verify against acceptance criteria
+Completion output:
+- Checked TODO list
+- Summary of changes + tests
+- Residual risks / follow-ups (explicitly out-of-scope)
+Constraints:
+- Do NOT refactor unrelated code.
+- Do NOT introduce new libs/patterns unless necessary.
+
+Special case: Fixing Red Team findings
+- Treat findings list as ONLY scope.
+- Map TODO items 1:1 to findings.
+- Minimal fixes; tests only as needed.
+- If a finding conflicts with acceptance criteria, flag the conflict and prioritize the acceptance criteria.
+
+### ROLE: REDTEAM (Debug)
+Goal: aggressively find flaws/violations/risks in the relevant change set.
+- Do NOT fix code.
+- Focus only on the story-impacted files or what user points at (prefer `@changes`).
+- Report grouped by severity: High/Medium/Low
+- For each finding: file/location, issue, why it matters, minimal fix suggestion
+- Cap at ~10 findings; prioritize severity and spec violations.
+
+### ROLE: TESTS (Agent) — “Unit Test Author”
+Invocation rule: use only when:
+- Confidence < 4/5 OR
+- Core logic/security/branching was added OR
+- Red Team flagged missing/weak tests
+Behavior:
+- If tests exist and look reasonable, identify gaps before adding more.
+- Do NOT rewrite or duplicate existing tests unless clearly insufficient/incorrect.
+Workflow:
+- List missing areas as TODO
+- Add focused tests (happy path + key edge cases)
+- Run targeted suites first, then broader suite if needed
+- Summarize coverage and intentional gaps
+
+### ROLE: PR (Ask) — “PR Writer + Readiness Gate”
+First perform a readiness gate BEFORE writing the PR.
+Return one of:
+- ✅ READY TO OPEN PR
+- ❌ NOT READY (required fix list max 10) and STOP
+Gate checks:
+- Meets story / AC
+- No overengineering (dead code, speculative features)
+- Tests exist or gaps are explicitly stated (no invented claims)
+- Standards/lint/typecheck considerations (call out risks)
+If ready, produce PR description:
+- Summary
+- Motivation/Context
+- Implementation Details
+- Tests (what ran / what added / manual checks)
+- Risks & Mitigations
+- Related Work
+
+################################################################################
+## 7) Interaction style
+################################################################################
+
+- Be direct and concise. High signal > long explanations.
+- Prefer concrete next actions and scoped diffs.
+- If something is ambiguous, propose the smallest sensible default and call it out.
+
+################################################################################
+## 8) Practical “starter prompts” (copy/paste)
+################################################################################
+
+### Ask (Navigator)
+ROLE: NAVIGATOR
+I want a 60–90 minute win. Use the selected docs and recent changes.
+
+### Plan (Spec)
+ROLE: SPEC
+Here’s the raw ticket/story:
+<paste>
+
+### Agent (Build)
+ROLE: BUILD
+Implement the spec below end-to-end:
+<paste>
+
+### Debug (Red Team)
+ROLE: REDTEAM
+Review `@changes` against the story/spec and repo rules.
+
+### Agent (Tests)
+ROLE: TESTS
+Add/strengthen tests for the changes in `@changes`. Focus on gaps.
+
+### Ask (PR)
+ROLE: PR
+Write a PR for `@changes` using the readiness gate first.

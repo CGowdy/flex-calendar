@@ -45,7 +45,7 @@ afterAll(async () => {
 })
 
 describe('calendarService.shiftScheduledItems', () => {
-  it('shifts downstream items for linked layers', async () => {
+  it('shifts downstream items within the same layer only', async () => {
     const calendar = await createCalendar({
       name: 'Test Calendar',
       startDate: new Date('2025-08-04').toISOString(),
@@ -84,6 +84,9 @@ describe('calendarService.shiftScheduledItems', () => {
     const referenceBefore = calendar.scheduledItems.find(
       (item) => item.layerKey === 'reference' && item.sequenceIndex === 3
     )!
+    const referenceAfter = calendar.scheduledItems.find(
+      (item) => item.layerKey === 'reference' && item.sequenceIndex === 4
+    )!
     const progressBefore = calendar.scheduledItems.find(
       (item) => item.layerKey === 'progress-a' && item.sequenceIndex === 3
     )!
@@ -99,6 +102,7 @@ describe('calendarService.shiftScheduledItems', () => {
     const refreshed = await getCalendarById(calendar.id)
     expect(refreshed).not.toBeNull()
 
+    // Verify the shifted item moved
     const shiftedReference = refreshed!.scheduledItems.find(
       (item: CalendarDTO['scheduledItems'][number]) =>
         item.layerKey === 'reference' && item.sequenceIndex === 3
@@ -109,17 +113,28 @@ describe('calendarService.shiftScheduledItems', () => {
       originalDate + 1000 * 60 * 60 * 24 * shiftBy
     )
 
-    const shiftedProgress = refreshed!.scheduledItems.find(
+    // Verify downstream items in the same layer shifted
+    const shiftedReferenceAfter = refreshed!.scheduledItems.find(
+      (item: CalendarDTO['scheduledItems'][number]) =>
+        item.layerKey === 'reference' && item.sequenceIndex === 4
+    )
+    expect(shiftedReferenceAfter).toBeDefined()
+    expect(new Date(shiftedReferenceAfter!.date).getTime()).toBeGreaterThan(
+      new Date(referenceAfter.date).getTime()
+    )
+
+    // Verify items in OTHER layers are NOT affected
+    const unchangedProgress = refreshed!.scheduledItems.find(
       (item: CalendarDTO['scheduledItems'][number]) =>
         item.layerKey === 'progress-a' && item.sequenceIndex === 3
     )
-    expect(shiftedProgress).toBeDefined()
-    expect(new Date(shiftedProgress!.date).getTime()).toBeGreaterThan(
-      new Date(progressBefore.date).getTime()
+    expect(unchangedProgress).toBeDefined()
+    expect(new Date(unchangedProgress!.date).toISOString()).toBe(
+      new Date(progressBefore.date).toISOString()
     )
   })
 
-  it('limits shifts to explicit layer keys', async () => {
+  it('shifts only within the specified layer when layerKeys is provided', async () => {
     const calendar = await createCalendar({
       name: 'Partial Shift',
       startDate: new Date('2025-08-04').toISOString(),
@@ -148,6 +163,9 @@ describe('calendarService.shiftScheduledItems', () => {
     )
     expect(itemToShift).toBeDefined()
 
+    const referenceBefore = calendar.scheduledItems.find(
+      (item) => item.layerKey === 'reference' && item.sequenceIndex === 3
+    )
     const progressBefore = calendar.scheduledItems.find(
       (item) => item.layerKey === 'progress-b' && item.sequenceIndex === 2
     )
@@ -162,6 +180,17 @@ describe('calendarService.shiftScheduledItems', () => {
     const refreshed = await getCalendarById(calendar.id)
     expect(refreshed).not.toBeNull()
 
+    // Verify reference layer items shifted
+    const updatedReference = refreshed!.scheduledItems.find(
+      (item: CalendarDTO['scheduledItems'][number]) =>
+        item.layerKey === 'reference' && item.sequenceIndex === 3
+    )
+    expect(updatedReference).toBeDefined()
+    expect(new Date(updatedReference!.date).getTime()).toBeGreaterThan(
+      new Date(referenceBefore!.date).getTime()
+    )
+
+    // Verify progress layer items did NOT shift
     const updatedProgress = refreshed!.scheduledItems.find(
       (item: CalendarDTO['scheduledItems'][number]) =>
         item.layerKey === 'progress-b' && item.sequenceIndex === 2
@@ -169,6 +198,72 @@ describe('calendarService.shiftScheduledItems', () => {
     expect(updatedProgress).toBeDefined()
     expect(new Date(updatedProgress!.date).toISOString()).toBe(
       new Date(progressBefore!.date).toISOString()
+    )
+  })
+
+  it('shifts only within the same layer by default (no layerKeys specified)', async () => {
+    const calendar = await createCalendar({
+      name: 'Default Single Layer',
+      startDate: new Date('2025-08-04').toISOString(),
+      includeWeekends: false,
+      includeExceptions: false,
+      layers: [
+        {
+          key: 'layer-a',
+          name: 'Layer A',
+          chainBehavior: 'linked',
+          kind: 'standard',
+          templateConfig: { mode: 'generated', itemCount: 5, titlePattern: 'A {n}' },
+        },
+        {
+          key: 'layer-b',
+          name: 'Layer B',
+          chainBehavior: 'linked',
+          kind: 'standard',
+          templateConfig: { mode: 'generated', itemCount: 5, titlePattern: 'B {n}' },
+        },
+      ],
+    })
+
+    const itemToShift = calendar.scheduledItems.find(
+      (item) => item.layerKey === 'layer-a' && item.sequenceIndex === 2
+    )
+    expect(itemToShift).toBeDefined()
+
+    const layerABefore = calendar.scheduledItems.find(
+      (item) => item.layerKey === 'layer-a' && item.sequenceIndex === 3
+    )
+    const layerBBefore = calendar.scheduledItems.find(
+      (item) => item.layerKey === 'layer-b' && item.sequenceIndex === 2
+    )
+
+    await shiftScheduledItems(calendar.id, {
+      scheduledItemId: itemToShift!.id,
+      shiftByDays: 1,
+      // No layerKeys specified - should default to same layer only
+    })
+
+    const refreshed = await getCalendarById(calendar.id)
+    expect(refreshed).not.toBeNull()
+
+    // Layer A items should shift
+    const updatedLayerA = refreshed!.scheduledItems.find(
+      (item: CalendarDTO['scheduledItems'][number]) =>
+        item.layerKey === 'layer-a' && item.sequenceIndex === 3
+    )
+    expect(updatedLayerA).toBeDefined()
+    expect(new Date(updatedLayerA!.date).getTime()).toBeGreaterThan(
+      new Date(layerABefore!.date).getTime()
+    )
+
+    // Layer B items should NOT shift
+    const updatedLayerB = refreshed!.scheduledItems.find(
+      (item: CalendarDTO['scheduledItems'][number]) =>
+        item.layerKey === 'layer-b' && item.sequenceIndex === 2
+    )
+    expect(updatedLayerB).toBeDefined()
+    expect(new Date(updatedLayerB!.date).toISOString()).toBe(
+      new Date(layerBBefore!.date).toISOString()
     )
   })
 })
