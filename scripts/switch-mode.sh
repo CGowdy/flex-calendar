@@ -25,7 +25,7 @@ NODE_ENV=development
 PORT=3333
 HOST=0.0.0.0
 # Connect to local Docker Mongo (see infra/docker-compose.dev.yml)
-MONGODB_URI=mongodb://root:example@localhost:27017/flex-calendar?authMechanism=DEFAULT
+MONGODB_URI=mongodb://root:example@localhost:27018/flex-calendar?authMechanism=DEFAULT
 # CORS not needed; Vite dev server proxies /api
 # CORS_ORIGIN=http://localhost:5173
 # Frontend uses Vite proxy; leave unset unless bypassing proxy

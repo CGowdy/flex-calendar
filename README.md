@@ -44,7 +44,7 @@ bun run dev:full
 
 - Frontend: http://localhost:5173  
 - API: http://localhost:3333 (Vite proxies `/api` → API)
- - Mongo Express: http://localhost:8081 (login user/pass: admin/admin)
+ - Mongo Express: http://localhost:8083 (login user/pass: admin/admin)
 
 #### Switch between dev and full-stack envs
 
@@ -135,7 +135,7 @@ This uses the same `MONGODB_URI` configured for the API.
 
 See `env.example` for defaults. Key values:
 
-- `MONGODB_URI` – Mongo connection string (dev: `mongodb://root:example@localhost:27017/flex-calendar?authMechanism=DEFAULT`)  
+- `MONGODB_URI` – Mongo connection string (dev: `mongodb://root:example@localhost:27018/flex-calendar?authMechanism=DEFAULT`)  
 - `PORT` / `HOST` – Fastify listener  
 - `CORS_ORIGIN` – Optional in dev (Vite proxy handles same-origin)  
 - `VITE_API_URL` – Optional override when not using the Vite proxy

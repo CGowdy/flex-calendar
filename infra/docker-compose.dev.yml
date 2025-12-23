@@ -8,7 +8,7 @@ services:
     env_file:
       - ../.env.mongo
     ports:
-      - "27017:27017"
+      - "27018:27017"
     volumes:
       - mongo-data:/data/db
 
@@ -24,7 +24,7 @@ services:
       - ME_CONFIG_BASICAUTH_USERNAME=${ME_USER:-admin}
       - ME_CONFIG_BASICAUTH_PASSWORD=${ME_PASS:-admin}
     ports:
-      - "8081:8081"
+      - "8083:8081"
     depends_on:
       - mongo
 
