@@ -4,6 +4,7 @@ import type {
   CalendarLayer,
   ShiftScheduledItemsRequest,
 } from '../types/calendar'
+import { buildExceptionLookup, type ExceptionLookup } from './useExceptionLookup'
 
 function addDays(date: Date, days: number): Date {
   const result = new Date(date)
@@ -29,15 +30,29 @@ function getExceptionLayerKeys(layers: CalendarLayer[]): Set<string> {
   )
 }
 
-function getExceptionDates(calendar: Calendar): Set<string> {
-  const exceptionLayerKeys = getExceptionLayerKeys(calendar.layers)
-  const exceptionSet = new Set<string>()
-  for (const item of calendar.scheduledItems) {
-    if (exceptionLayerKeys.has(item.layerKey)) {
-      exceptionSet.add(normalizeDate(new Date(item.date)))
-    }
+function getBlockedDatesForLayer(
+  layerKey: string,
+  lookup: ExceptionLookup,
+  respectsGlobal: boolean
+): Set<string> | undefined {
+  const perLayerSet = lookup.perLayer[layerKey]
+  if (!respectsGlobal && !perLayerSet) {
+    return undefined
   }
-  return exceptionSet
+  if (!respectsGlobal) {
+    return perLayerSet
+  }
+
+  if (lookup.global.size === 0 && !perLayerSet) {
+    return undefined
+  }
+
+  const combined = new Set<string>()
+  lookup.global.forEach((value) => combined.add(value))
+  if (perLayerSet) {
+    perLayerSet.forEach((value) => combined.add(value))
+  }
+  return combined
 }
 
 function countValidDaySpan(
@@ -170,14 +185,26 @@ export function useScheduleAdjuster() {
       targetItem.layerKey
     )
 
-    const exceptionDates = getExceptionDates(workingCopy)
+    const exceptionLookup = buildExceptionLookup(workingCopy)
+
+    const targetLayer = workingCopy.layers.find((l) => l.key === targetItem.layerKey)
+    const targetBlockedDates =
+      workingCopy.includeExceptions && targetLayer
+        ? getBlockedDatesForLayer(
+            targetItem.layerKey,
+            exceptionLookup,
+            targetLayer.respectsGlobalExceptions !== false
+          )
+        : workingCopy.includeExceptions
+          ? exceptionLookup.global
+          : undefined
 
     const rawNewDate = addDays(new Date(targetItem.date), payload.shiftByDays)
 
     const newTargetDate = nextSchoolDate(
       rawNewDate,
       workingCopy.includeWeekends,
-      exceptionDates
+      targetBlockedDates
     )
 
     const startingSequence = targetItem.sequenceIndex ?? 0
@@ -224,13 +251,26 @@ export function useScheduleAdjuster() {
     for (let i = 0; i < itemsToReflow.length - 1; i++) {
       const current = new Date(itemsToReflow[i]!.date)
       const next = new Date(itemsToReflow[i + 1]!.date)
+      const nextLayer = workingCopy.layers.find((l) => l.key === itemsToReflow[i + 1]!.layerKey)
+      const blockedDatesForNext =
+        workingCopy.includeExceptions && nextLayer
+          ? getBlockedDatesForLayer(
+              nextLayer.key,
+              exceptionLookup,
+              nextLayer.respectsGlobalExceptions !== false
+            )
+          : workingCopy.includeExceptions
+            ? exceptionLookup.global
+            : undefined
       const span = countValidDaySpan(
         current,
         next,
         workingCopy.includeWeekends,
-        exceptionDates
+        blockedDatesForNext
       )
-      gapSpans.push(span > 0 ? span : 1)
+      // Guard against invalid spans (shouldn't exceed reasonable bounds)
+      const safeSpan = span > 0 && span < 1000 ? span : 1
+      gapSpans.push(safeSpan)
     }
 
     const firstItem = itemsToReflow[0]!
@@ -252,11 +292,22 @@ export function useScheduleAdjuster() {
     for (let i = 0; i < remainingItems.length; i++) {
       const item = remainingItems[i]!
       const span = gapSpans[i] ?? 1
+      const itemLayer = workingCopy.layers.find((l) => l.key === item.layerKey)
+      const blockedDates =
+        workingCopy.includeExceptions && itemLayer
+          ? getBlockedDatesForLayer(
+              itemLayer.key,
+              exceptionLookup,
+              itemLayer.respectsGlobalExceptions !== false
+            )
+          : workingCopy.includeExceptions
+            ? exceptionLookup.global
+            : undefined
       const nextDate = addValidSchoolDays(
         previousDate,
         span,
         workingCopy.includeWeekends,
-        exceptionDates
+        blockedDates
       )
       updatedItemsMap.set(item.id, {
         ...item,

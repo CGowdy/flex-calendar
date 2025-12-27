@@ -14,6 +14,7 @@ import {
 import {
   addScheduledItem,
   createCalendar,
+  deleteLayer,
   getCalendarById,
   listCalendars,
   shiftScheduledItems,
@@ -50,6 +51,20 @@ export async function calendarsRoutes(app: FastifyInstance) {
     const calendar = await updateCalendar(calendarId, body)
     if (!calendar) {
       throw app.httpErrors.notFound('Calendar not found')
+    }
+    return calendar
+  })
+
+  app.delete('/:calendarId/layers/:layerKey', async (request) => {
+    const { calendarId, layerKey } = z
+      .object({
+        calendarId: z.string().min(1),
+        layerKey: z.string().min(1),
+      })
+      .parse(request.params)
+    const calendar = await deleteLayer(calendarId, layerKey)
+    if (!calendar) {
+      throw app.httpErrors.notFound('Calendar or layer not found')
     }
     return calendar
   })

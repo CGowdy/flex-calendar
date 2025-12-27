@@ -90,3 +90,12 @@ export async function createScheduledItem(
   })
 }
 
+export async function deleteLayer(
+  calendarId: string,
+  layerKey: string
+): Promise<Calendar> {
+  return apiFetch<Calendar>(`/calendars/${calendarId}/layers/${layerKey}`, {
+    method: 'DELETE',
+  })
+}
+

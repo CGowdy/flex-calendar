@@ -4,6 +4,8 @@ import MiniCalendar from './MiniCalendar.vue'
 import LayerQuickAddForm from './LayerQuickAddForm.vue'
 import Popover from 'primevue/popover'
 import { useCalendarStore } from '@stores/useCalendarStore'
+import Card from './ui/Card.vue'
+import EmptyState from './ui/EmptyState.vue'
 
 import type {
   Calendar,
@@ -28,6 +30,7 @@ const quickAddOpen = ref(false)
 const isCreatingLayer = ref(false)
 const layerError = ref<string | null>(null)
 const formInstanceKey = ref(0)
+const deletingLayerKey = ref<string | null>(null)
 
 // Keep a local month for the mini calendar so arrow navigation doesn't move the big calendar.
 const miniDate = ref(new Date(props.viewDate))
@@ -56,6 +59,22 @@ function handlePopoverHide() {
   quickAddOpen.value = false
   layerError.value = null
   formInstanceKey.value += 1
+}
+
+async function handleDeleteLayer(layerKey: string) {
+  if (!confirm(`Delete this layer? All events in this layer will be removed.`)) {
+    return
+  }
+
+  deletingLayerKey.value = layerKey
+  try {
+    await store.deleteLayerForActiveCalendar(layerKey)
+  } catch (error) {
+    console.error('Failed to delete layer:', error)
+    alert(error instanceof Error ? error.message : 'Failed to delete layer')
+  } finally {
+    deletingLayerKey.value = null
+  }
 }
 
 function handlePopoverCancel() {
@@ -209,6 +228,17 @@ function formatDate(date: Date | null): string {
                 Exception
               </span>
             </div>
+            <button
+              v-if="calendar.layers.length > 1"
+              type="button"
+              class="inline-flex h-6 w-6 items-center justify-center rounded text-slate-400 transition hover:bg-slate-100 hover:text-red-600 dark:hover:bg-slate-700 dark:hover:text-red-400"
+              :disabled="deletingLayerKey === layer.key || store.isLoading"
+              :title="`Delete ${layer.name} layer`"
+              @click="handleDeleteLayer(layer.key)"
+            >
+              <span aria-hidden="true">×</span>
+              <span class="sr-only">Delete {{ layer.name }} layer</span>
+            </button>
             <input
               class="h-5 w-10 cursor-pointer rounded border border-slate-200 bg-transparent p-0 dark:border-slate-600"
               type="color"

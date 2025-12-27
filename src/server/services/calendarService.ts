@@ -1227,3 +1227,37 @@ export async function updateCalendar(
   return toCalendarDTO(calendar)
 }
 
+export async function deleteLayer(
+  calendarId: string,
+  layerKey: string
+): Promise<CalendarDTO | null> {
+  if (!Types.ObjectId.isValid(calendarId)) {
+    return null
+  }
+
+  const calendar = await CalendarModel.findById(calendarId).exec()
+  if (!calendar) {
+    return null
+  }
+
+  // Find the layer
+  const layerIndex = calendar.layers.findIndex((layer) => layer.key === layerKey)
+  if (layerIndex === -1) {
+    return null
+  }
+
+  // Remove the layer
+  calendar.layers.splice(layerIndex, 1)
+
+  // Remove all scheduled items in this layer
+  calendar.scheduledItems = calendar.scheduledItems.filter(
+    (item) => item.layerKey !== layerKey
+  ) as unknown as typeof calendar.scheduledItems
+
+  calendar.markModified('layers')
+  calendar.markModified('scheduledItems')
+  await calendar.save()
+
+  return toCalendarDTO(calendar)
+}
+

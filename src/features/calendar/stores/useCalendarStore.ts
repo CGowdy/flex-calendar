@@ -6,6 +6,7 @@ import {
   fetchCalendarById,
   fetchCalendars,
   createScheduledItem as apiCreateScheduledItem,
+  deleteLayer as apiDeleteLayer,
   shiftScheduledItems,
   updateCalendarMeta,
   updateExceptions as apiUpdateExceptions,
@@ -253,6 +254,29 @@ export const useCalendarStore = defineStore('calendar', () => {
     return updated
   }
 
+  async function deleteLayerForActiveCalendar(layerKey: string): Promise<Calendar | null> {
+    if (!activeCalendar.value || !activeCalendarId.value) {
+      throw new Error('Select a calendar before deleting layers')
+    }
+
+    isLoading.value = true
+    errorMessage.value = null
+    try {
+      const updated = await apiDeleteLayer(activeCalendarId.value, layerKey)
+      activeCalendar.value = updated
+      calendars.value = calendars.value.map((summary) =>
+        summary.id === updated.id ? updated : summary
+      )
+      return updated
+    } catch (error) {
+      errorMessage.value =
+        error instanceof Error ? error.message : 'Failed to delete layer'
+      throw error
+    } finally {
+      isLoading.value = false
+    }
+  }
+
   function selectCalendar(calendarId: string | null) {
     activeCalendarId.value = calendarId
     if (calendarId === null) {
@@ -415,6 +439,7 @@ export const useCalendarStore = defineStore('calendar', () => {
     persistLayerColor,
     schedulePersistLayerColor,
     createLayerForActiveCalendar,
+    deleteLayerForActiveCalendar,
     updateExceptions,
     splitScheduledItem,
     addScheduledItem,

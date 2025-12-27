@@ -2,6 +2,7 @@
 import { computed, reactive } from 'vue'
 
 import type { CreateCalendarRequest } from '@/features/calendar/types/calendar'
+import Card from './ui/Card.vue'
 
 const props = defineProps<{
   submitting?: boolean
@@ -179,7 +180,7 @@ function handleSubmit() {
           :disabled="submitting"
           class="h-4 w-4 rounded border-slate-300 text-brand focus:ring-brand dark:border-slate-600"
         />
-        <span>Let exceptions move with shifts</span>
+        <span>Enable exceptions (skip blocked dates)</span>
       </label>
     </div>
 

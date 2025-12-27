@@ -2,6 +2,7 @@
 import { computed, ref, watch } from 'vue'
 
 import { useCalendarStore } from '@stores/useCalendarStore'
+import { updateCalendarMeta } from '@api/calendarApi'
 import type { Calendar } from '@/features/calendar/types/calendar'
 import type { UpdateExceptionsRequest } from '@/features/calendar/types/calendar'
 import Modal from './ui/Modal.vue'
@@ -30,6 +31,20 @@ const selectedLayerKey = ref<string>('')
 const targetedLayers = ref<string[]>([])
 const formError = ref<string | null>(null)
 const submitting = ref(false)
+const updatingSettings = ref(false)
+
+const exceptionEnabledDraft = ref<boolean>(false)
+watch(
+  () => [props.open, props.calendar.id, props.calendar.includeExceptions] as const,
+  ([open]) => {
+    if (!open) return
+    exceptionEnabledDraft.value = props.calendar.includeExceptions
+  },
+  { immediate: true }
+)
+const settingsDirty = computed(
+  () => exceptionEnabledDraft.value !== props.calendar.includeExceptions
+)
 
 const exceptionLayers = computed(() =>
   props.calendar.layers.filter((layer) => layer.kind === 'exception')
@@ -73,7 +88,37 @@ watch(
   { immediate: true }
 )
 
-async function handleSubmit() {
+function resetSettingsDraft() {
+  exceptionEnabledDraft.value = props.calendar.includeExceptions
+}
+
+async function saveSettings() {
+  if (!props.calendar.id || updatingSettings.value || !settingsDirty.value) {
+    return
+  }
+
+  updatingSettings.value = true
+  formError.value = null
+  try {
+    await updateCalendarMeta(props.calendar.id, {
+      includeExceptions: exceptionEnabledDraft.value,
+    })
+    // Force reload to ensure we have server truth (and it persists)
+    if (calendarStore.activeCalendarId === props.calendar.id) {
+      await calendarStore.loadCalendar(props.calendar.id)
+    }
+  } catch (error) {
+    formError.value =
+      error instanceof Error ? error.message : 'Failed to update exception settings'
+    console.error('Failed to update exception settings:', error)
+    // Revert the draft so we don't leave UI in a confusing state
+    resetSettingsDraft()
+  } finally {
+    updatingSettings.value = false
+  }
+}
+
+  async function handleSubmit() {
   if (!props.calendar) return
   if (!dateInput.value) {
     formError.value = 'Select a date to block.'
@@ -144,8 +189,56 @@ async function handleRemove(entryId: string, layerKey: string) {
     </EmptyState>
 
     <div v-else class="grid gap-6 md:grid-cols-[minmax(320px,360px)_1fr]">
-      <Card padding="lg">
-            <form class="flex flex-col gap-4" @submit.prevent="handleSubmit">
+      <div class="space-y-4">
+        <Card padding="lg">
+          <h3 class="text-base font-semibold text-slate-900 dark:text-white">
+            Exception Settings
+          </h3>
+          <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">
+            When enabled, exception dates will prevent items from being scheduled or shifted to those dates.
+            <span
+              v-if="!props.calendar.includeExceptions"
+              class="font-semibold text-orange-600 dark:text-orange-400"
+            >
+              Currently disabled — exceptions are not being respected.
+            </span>
+          </p>
+
+          <label class="mt-3 inline-flex items-center gap-3 text-sm text-slate-600 dark:text-slate-300">
+            <input
+              v-model="exceptionEnabledDraft"
+              type="checkbox"
+              :disabled="updatingSettings"
+              class="h-4 w-4 rounded border-slate-300 text-brand focus:ring-brand dark:border-slate-600"
+            />
+            <span>Enable exceptions</span>
+          </label>
+
+          <div class="mt-4 flex items-center justify-end gap-3">
+            <span v-if="updatingSettings" class="mr-auto text-xs text-slate-500 dark:text-slate-400">
+              Saving…
+            </span>
+            <Button
+              type="button"
+              variant="secondary"
+              :disabled="updatingSettings || !settingsDirty"
+              @click="resetSettingsDraft"
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              variant="primary"
+              :disabled="updatingSettings || !settingsDirty"
+              @click="saveSettings"
+            >
+              Save
+            </Button>
+          </div>
+        </Card>
+
+        <Card padding="lg">
+          <form class="flex flex-col gap-4" @submit.prevent="handleSubmit">
               <label class="flex flex-col gap-2 text-sm font-semibold text-slate-600 dark:text-slate-200">
                 <span>Exception layer</span>
                 <select
@@ -240,8 +333,9 @@ async function handleRemove(entryId: string, layerKey: string) {
                 <span v-if="submitting">Saving…</span>
                 <span v-else>Add exception date</span>
               </Button>
-            </form>
-      </Card>
+          </form>
+        </Card>
+      </div>
 
       <Card padding="lg">
             <h3 class="text-lg font-semibold text-slate-900 dark:text-white">

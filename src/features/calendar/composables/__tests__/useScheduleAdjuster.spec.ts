@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import { useScheduleAdjuster } from '../useScheduleAdjuster'
+import { buildExceptionLookup } from '../useExceptionLookup'
 import type { Calendar } from '../../types/calendar'
 
 const toUtcIso = (date: string) => new Date(`${date}T00:00:00.000Z`).toISOString()
@@ -223,6 +224,106 @@ describe('useScheduleAdjuster', () => {
       new Date(item1AfterSecondShift.date).getTime()
 
     expect(finalGapMs).toBe(initialGapMs)
+  })
+
+  it('skips global exception dates when shifting items', () => {
+    const adjuster = useScheduleAdjuster()
+    const calendar: Calendar = {
+      id: 'cal-exception',
+      name: 'Exception Test',
+      startDate: toUtcIso('2025-12-14'),
+      includeWeekends: false,
+      includeExceptions: true,
+      layers: [
+        {
+          key: 'mercy',
+          name: "Mercy's School",
+          color: '#ef4444',
+          description: '',
+          chainBehavior: 'linked',
+          kind: 'standard',
+          respectsGlobalExceptions: true,
+        },
+        {
+          key: 'exceptions',
+          name: 'Holidays',
+          color: '#22c55e',
+          description: '',
+          chainBehavior: 'independent',
+          kind: 'exception',
+        },
+      ],
+      scheduledItems: [
+        {
+          id: 'mercy-73',
+          date: toUtcIso('2025-12-12'),
+          layerKey: 'mercy',
+          sequenceIndex: 73,
+          title: 'Day 73',
+          description: '',
+          notes: '',
+          durationDays: 1,
+          metadata: {},
+        },
+        {
+          id: 'mercy-74',
+          date: toUtcIso('2025-12-13'),
+          layerKey: 'mercy',
+          sequenceIndex: 74,
+          title: 'Day 74',
+          description: '',
+          notes: '',
+          durationDays: 1,
+          metadata: {},
+        },
+        {
+          id: 'mercy-75',
+          date: toUtcIso('2025-12-16'),
+          layerKey: 'mercy',
+          sequenceIndex: 75,
+          title: 'Day 75',
+          description: '',
+          notes: '',
+          durationDays: 1,
+          metadata: {},
+        },
+        {
+          id: 'exception-15',
+          date: toUtcIso('2025-12-15'),
+          layerKey: 'exceptions',
+          sequenceIndex: 1,
+          title: 'Exception Day',
+          description: '',
+          notes: '',
+          durationDays: 1,
+          metadata: {},
+          // No targetLayerKeys = global exception
+        },
+      ],
+    }
+
+    // Shift Day 73 back by 1 day (from 12th to 11th)
+    // Day 74 should move to 12th (where Day 73 was)
+    // Day 75 should stay on 16th, skipping the exception on 15th
+    const shifted = adjuster.shiftScheduledItemsLocally(calendar, {
+      scheduledItemId: 'mercy-73',
+      shiftByDays: -1,
+    })
+
+    const day73 = shifted.scheduledItems.find((item) => item.id === 'mercy-73')!
+    const day74 = shifted.scheduledItems.find((item) => item.id === 'mercy-74')!
+    const day75 = shifted.scheduledItems.find((item) => item.id === 'mercy-75')!
+
+    // Day 73 should move back 1 day (to 11th)
+    expect(new Date(day73.date).toISOString().slice(0, 10)).toBe('2025-12-11')
+
+    // Day 74 should move to where Day 73 was (12th), maintaining 1-day gap
+    expect(new Date(day74.date).toISOString().slice(0, 10)).toBe('2025-12-12')
+
+    // Day 75 should stay on 16th, skipping the exception on 15th
+    // The gap between Day 74 (13th) and Day 75 (16th) is preserved
+    // When Day 74 moves to 12th, Day 75 maintains the same gap pattern, staying on 16th
+    expect(new Date(day75.date).toISOString().slice(0, 10)).toBe('2025-12-16')
   })
 })
 

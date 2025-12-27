@@ -321,7 +321,7 @@ function toggleLayerSelection(option: LayerOption) {
                 type="checkbox"
                 class="h-4 w-4 rounded border-slate-300 text-brand focus:ring-brand dark:border-slate-600"
               />
-              <span>Allow exception layers to shift with the schedule</span>
+              <span>Enable exception layers (skip blocked dates)</span>
             </label>
           </div>
         </section>

@@ -9,10 +9,10 @@ export function dayKey(date: Date | string): string {
 }
 
 export function parseIsoDate(iso: string): Date {
+  // Parse as UTC to avoid timezone issues when comparing with daysBetween
+  // which uses UTC components. This ensures "2025-12-26" is always 2025-12-26 00:00:00 UTC
   const [year, month, day] = iso.split('-').map(Number)
-  const date = new Date(year ?? 0, (month ?? 1) - 1, day ?? 1)
-  date.setHours(0, 0, 0, 0)
-  return date
+  return new Date(Date.UTC(year ?? 0, (month ?? 1) - 1, day ?? 1, 0, 0, 0, 0))
 }
 
 export function addDays(date: Date, n: number): Date {
